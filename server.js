@@ -74,8 +74,8 @@ function generarMapa(tipo) {
         // Solo pilares decorativos en intersecciones (no en pasillos)
         [[6,6],[6,17],[17,6],[17,17]].forEach(([x,y]) => { m[y][x]=1; });
         return { tiles: m, ancho: W, alto: H,
-                 spawns: [{x:2,y:2},{x:21,y:2},{x:2,y:21},{x:21,y:21},
-                           {x:11,y:2},{x:2,y:11},{x:21,y:11},{x:11,y:21}] };
+                 spawns: [{x:4,y:3},{x:19,y:3},{x:4,y:19},{x:19,y:19},
+                           {x:11,y:4},{x:4,y:11},{x:19,y:11},{x:11,y:19}] };
     }
     if (tipo === 'catacumba_2') {
         const W = 36, H = 36;
@@ -97,8 +97,8 @@ function generarMapa(tipo) {
         m[9][9]=3; m[9][26]=3; m[26][9]=3; m[26][26]=3;
         m[5][17]=5; m[17][5]=5; m[29][17]=5; m[17][29]=5;
         return { tiles: m, ancho: W, alto: H,
-                 spawns: [{x:4,y:4},{x:31,y:4},{x:4,y:31},{x:31,y:31},
-                           {x:18,y:4},{x:4,y:18},{x:31,y:18},{x:18,y:31}] };
+                 spawns: [{x:4,y:4},{x:30,y:4},{x:4,y:30},{x:30,y:30},
+                           {x:18,y:3},{x:3,y:18},{x:30,y:18},{x:18,y:30}] };
     }
     // templo_3
     const W = 32, H = 32;
@@ -115,8 +115,8 @@ function generarMapa(tipo) {
     [[3,3],[3,28],[28,3],[28,28]].forEach(([x,y])=>{m[y][x]=3;});
     [[7,7],[7,24],[24,7],[24,24]].forEach(([x,y])=>{m[y][x]=7;});
     return { tiles: m, ancho: W, alto: H,
-             spawns: [{x:2,y:2},{x:29,y:2},{x:2,y:29},{x:29,y:29},
-                       {x:15,y:2},{x:2,y:15},{x:29,y:15},{x:15,y:29}] };
+             spawns: [{x:4,y:3},{x:26,y:3},{x:4,y:26},{x:26,y:26},
+                       {x:15,y:3},{x:3,y:15},{x:27,y:15},{x:15,y:27}] };
 }
 
 // ─── MATCHMAKING ─────────────────────────────────────────────────────────────
