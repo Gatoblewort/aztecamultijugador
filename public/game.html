@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Aztec War — Batalla</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#000;overflow:hidden;font-family:'Segoe UI',sans-serif;touch-action:none;}
+#gameCanvas{display:block;width:100vw;height:100vh;image-rendering:pixelated;}
+
+/* ── HUD ── */
+#hud{position:fixed;top:0;left:0;right:0;pointer-events:none;z-index:10;}
+#hudTop{
+    display:flex;justify-content:space-between;align-items:flex-start;
+    padding:10px 16px;
+    background:linear-gradient(to bottom,#00000099,transparent);
+}
+.hud-block{background:#00000077;border-radius:10px;padding:8px 14px;
+    border:1px solid #ffffff15;backdrop-filter:blur(4px);}
+.hud-val{font-size:20px;font-weight:900;color:#ffd60a;}
+.hud-lbl{font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:1px;}
+#hudTimer{font-size:22px;font-weight:900;color:#fff;text-align:center;}
+#hudTimer.urgente{color:#ff4444;animation:timer-pulse .5s infinite alternate;}
+@keyframes timer-pulse{from{opacity:1}to{opacity:.4}}
+
+/* ── BARRA DE VIDA ── */
+#hudBottom{position:fixed;bottom:0;left:0;right:0;
+    padding:12px 16px;
+    background:linear-gradient(to top,#000000cc,transparent);
+    display:flex;justify-content:space-between;align-items:flex-end;}
+.hp-wrap{display:flex;flex-direction:column;gap:4px;}
+.hp-label{font-size:11px;color:#aaa;}
+.hp-bar{width:180px;height:10px;background:#ffffff22;border-radius:5px;overflow:hidden;
+    border:1px solid #ffffff22;}
+.hp-fill{height:100%;background:linear-gradient(90deg,#cc2222,#ff5555);
+    border-radius:5px;transition:width .3s;}
+.hp-fill.alto{background:linear-gradient(90deg,#06d6a0,#22ff99);}
+.hp-fill.medio{background:linear-gradient(90deg,#ffd60a,#ffaa00);}
+#hpText{font-size:14px;font-weight:800;color:#fff;}
+
+/* ── ARMA ── */
+#armaInfo{text-align:right;}
+#armaName{font-size:14px;font-weight:700;color:#a855f7;}
+#municion{font-size:12px;color:#8888aa;}
+
+/* ── KILLFEED ── */
+#killfeed{position:fixed;top:60px;right:14px;
+    display:flex;flex-direction:column;gap:4px;pointer-events:none;z-index:11;}
+.kf-item{background:#00000088;border-radius:8px;padding:5px 10px;
+    font-size:11px;color:#fff;border-left:3px solid #7c3aed;
+    animation:kf-in .3s ease; max-width:220px;}
+.kf-item.tuyo{border-left-color:#ffd60a;}
+@keyframes kf-in{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
+
+/* ── CHAT ── */
+#chatWrap{position:fixed;bottom:80px;left:14px;z-index:11;width:260px;}
+#chatLog{display:flex;flex-direction:column;gap:3px;max-height:120px;overflow:hidden;}
+.chat-msg{background:#00000077;border-radius:6px;padding:4px 8px;font-size:11px;color:#ddd;}
+.chat-msg .cn{color:#a855f7;font-weight:700;}
+#chatInput{width:100%;margin-top:6px;padding:7px 10px;border-radius:8px;
+    border:1px solid #ffffff22;background:#00000099;color:#fff;font-size:12px;
+    outline:none;display:none;}
+
+/* ── MINIMAP ── */
+#minimap{position:fixed;top:10px;left:14px;
+    width:120px;height:120px;border-radius:10px;
+    border:1px solid #ffffff22;overflow:hidden;opacity:.7;}
+
+/* ── CROSSHAIR ── */
+#crosshair{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+    pointer-events:none;z-index:10;}
+.ch-h{width:20px;height:2px;background:#ffffffcc;position:absolute;
+    top:50%;left:50%;transform:translate(-50%,-50%);}
+.ch-v{width:2px;height:20px;background:#ffffffcc;position:absolute;
+    top:50%;left:50%;transform:translate(-50%,-50%);}
+.ch-dot{width:4px;height:4px;border-radius:50%;background:#ffffffee;
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);}
+
+/* ── PANTALLAS OVERLAY ── */
+.overlay{position:fixed;inset:0;background:#000000cc;
+    display:flex;align-items:center;justify-content:center;z-index:50;
+    backdrop-filter:blur(6px);}
+.overlay-box{background:#1a1a2e;border-radius:20px;padding:36px;text-align:center;
+    border:1px solid #7c3aed44;max-width:420px;width:90%;}
+.overlay-box h2{font-size:26px;font-weight:900;margin-bottom:10px;}
+.overlay-box p{color:#aaa;font-size:14px;margin-bottom:20px;}
+.overlay-btn{padding:13px 28px;border-radius:12px;border:none;
+    background:linear-gradient(135deg,#7c3aed,#a855f7);
+    color:#fff;font-size:15px;font-weight:700;cursor:pointer;
+    transition:.2s;margin:5px;}
+.overlay-btn:hover{opacity:.85;transform:translateY(-2px);}
+.resultado-stats{display:flex;justify-content:center;gap:20px;margin:16px 0;}
+.rs{text-align:center;}
+.rs .v{font-size:24px;font-weight:900;color:#a855f7;}
+.rs .l{font-size:11px;color:#888;}
+
+/* ── RESPAWN ── */
+#respawnOverlay{display:none;}
+#respawnTimer{font-size:60px;font-weight:900;color:#ff4444;}
+
+/* ── CONTROLES MÓVIL ── */
+#joystickWrap{position:fixed;bottom:20px;left:20px;z-index:20;
+    width:120px;height:120px;touch-action:none;}
+#joystickBase{width:100px;height:100px;border-radius:50%;
+    background:#ffffff15;border:2px solid #ffffff33;
+    position:absolute;top:10px;left:10px;}
+#joystickThumb{width:40px;height:40px;border-radius:50%;
+    background:#7c3aed99;border:2px solid #a855f7;
+    position:absolute;top:30px;left:30px;transition:none;}
+#btnDisparar{position:fixed;bottom:30px;right:24px;z-index:20;
+    width:72px;height:72px;border-radius:50%;border:none;
+    background:linear-gradient(135deg,#cc2222,#ff4444);
+    color:#fff;font-size:22px;cursor:pointer;
+    box-shadow:0 0 20px #cc222266;touch-action:none;}
+#btnCambiarArma{position:fixed;bottom:115px;right:32px;z-index:20;
+    width:52px;height:52px;border-radius:50%;border:none;
+    background:#7c3aed99;color:#fff;font-size:18px;cursor:pointer;touch-action:none;}
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+
+<!-- HUD -->
+<div id="hud">
+    <div id="hudTop">
+        <div class="hud-block">
+            <div class="hud-val" id="hudKills">0</div>
+            <div class="hud-lbl">⚔️ Bajas</div>
+        </div>
+        <div class="hud-block">
+            <div id="hudTimer">05:00</div>
+            <div class="hud-lbl" style="text-align:center">Tiempo</div>
+        </div>
+        <div class="hud-block">
+            <div class="hud-val" id="hudMonedas">0</div>
+            <div class="hud-lbl">🪙 Monedas</div>
+        </div>
+    </div>
+</div>
+
+<!-- HP + Arma -->
+<div id="hudBottom">
+    <div class="hp-wrap">
+        <div class="hp-label">❤️ Vida</div>
+        <div class="hp-bar"><div class="hp-fill alto" id="hpFill" style="width:100%"></div></div>
+        <span id="hpText">100</span>
+    </div>
+    <div id="armaInfo">
+        <div id="armaName">Macuahuitl</div>
+        <div id="municion">Ilimitado</div>
+    </div>
+</div>
+
+<!-- Crosshair -->
+<div id="crosshair"><div class="ch-h"></div><div class="ch-v"></div><div class="ch-dot"></div></div>
+
+<!-- Killfeed -->
+<div id="killfeed"></div>
+
+<!-- Chat -->
+<div id="chatWrap">
+    <div id="chatLog"></div>
+    <input id="chatInput" placeholder="T para chatear..." maxlength="80"
+        onkeydown="chatKeydown(event)">
+</div>
+
+<!-- Minimap -->
+<canvas id="minimap"></canvas>
+
+<!-- Controles móvil -->
+<div id="joystickWrap">
+    <div id="joystickBase"></div>
+    <div id="joystickThumb"></div>
+</div>
+<button id="btnDisparar" ontouchstart="disparar()">🔥</button>
+<button id="btnCambiarArma" onclick="cambiarArma()">🗡️</button>
+
+<!-- Overlay resultado -->
+<div class="overlay" id="resultadoOverlay" style="display:none">
+    <div class="overlay-box">
+        <h2 id="resultadoTitulo">Partida terminada</h2>
+        <p id="resultadoSub"></p>
+        <div class="resultado-stats">
+            <div class="rs"><div class="v" id="resKills">0</div><div class="l">Bajas</div></div>
+            <div class="rs"><div class="v" id="resMuertes">0</div><div class="l">Muertes</div></div>
+            <div class="rs"><div class="v" id="resMonedas">0</div><div class="l">🪙</div></div>
+            <div class="rs"><div class="v" id="resPosicion">#1</div><div class="l">Posición</div></div>
+        </div>
+        <button class="overlay-btn" onclick="volverLobby()">🏠 Volver al Lobby</button>
+    </div>
+</div>
+
+<!-- Overlay respawn -->
+<div class="overlay" id="respawnOverlay">
+    <div class="overlay-box">
+        <h2>💀 Caíste en batalla</h2>
+        <p>Regresarás al campo de combate en...</p>
+        <div id="respawnTimer">5</div>
+    </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/game.js"></script>
+</body>
+</html>

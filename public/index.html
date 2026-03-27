@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aztec War</title>
+<link rel="stylesheet" href="/css/lobby.css">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#7c3aed">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Aztec War">
+</head>
+<body>
+
+<!-- ══ AUTH ══════════════════════════════════════════════════════════════ -->
+<div id="authScreen" class="screen active">
+    <div class="auth-box">
+        <div class="auth-logo">
+            <span class="sun-icon">☀️</span>
+            <div class="game-title">AZTEC WAR</div>
+            <div class="game-sub">BATALLA POR EL QUINTO SOL</div>
+        </div>
+        <div class="auth-tabs">
+            <button class="auth-tab active" onclick="setAuthTab('login',this)">⚔️ Entrar</button>
+            <button class="auth-tab" onclick="setAuthTab('register',this)">🛡️ Registrarse</button>
+        </div>
+        <!-- Login -->
+        <div id="loginForm">
+            <div class="form-group">
+                <input type="email" id="loginEmail" placeholder="📧 Correo electrónico">
+            </div>
+            <div class="form-group">
+                <input type="password" id="loginPassword" placeholder="🔒 Contraseña"
+                    onkeydown="if(event.key==='Enter')login()">
+            </div>
+            <button class="btn-primary" onclick="login()">⚔️ ENTRAR AL CAMPO DE BATALLA</button>
+        </div>
+        <!-- Registro -->
+        <div id="registerForm" style="display:none">
+            <div class="form-group">
+                <input type="text" id="regNombre" placeholder="🏹 Nombre de guerrero (3-20 chars)" maxlength="20">
+            </div>
+            <div class="form-group">
+                <input type="email" id="regEmail" placeholder="📧 Correo electrónico">
+            </div>
+            <div class="form-group">
+                <input type="password" id="regPassword" placeholder="🔒 Contraseña"
+                    onkeydown="if(event.key==='Enter')register()">
+            </div>
+            <button class="btn-primary" onclick="register()">🛡️ CREAR GUERRERO</button>
+        </div>
+        <div class="error-msg" id="authError"></div>
+    </div>
+</div>
+
+<!-- ══ APP ════════════════════════════════════════════════════════════════ -->
+<div id="appScreen" class="screen">
+
+    <!-- Sidebar escritorio -->
+    <div class="sidebar">
+        <div class="sidebar-logo">☀️ AZTEC WAR</div>
+        <div class="player-card" id="sidePlayerCard">
+            <div class="player-avatar" id="sideAvatar">?</div>
+            <div class="player-name"  id="sideNombre">Guerrero</div>
+            <div class="player-level" id="sideLevel">Nivel 1</div>
+            <div class="player-stats">
+                <div class="player-stat">
+                    <div class="val" id="sideKills">0</div>
+                    <div class="lbl">Bajas</div>
+                </div>
+                <div class="player-stat">
+                    <div class="val" id="sidePartidas">0</div>
+                    <div class="lbl">Partidas</div>
+                </div>
+                <div class="player-stat">
+                    <div class="val" id="sideMonedas">0</div>
+                    <div class="lbl">🪙</div>
+                </div>
+            </div>
+            <div class="xp-bar-wrap">
+                <div class="xp-label">
+                    <span>XP</span><span id="sideXp">0</span>
+                </div>
+                <div class="xp-bar"><div class="xp-fill" id="sideXpBar" style="width:0%"></div></div>
+            </div>
+        </div>
+
+        <div class="nav-section">Menú</div>
+        <button class="nav-btn active" onclick="irPagina('inicio',this)">
+            <span class="icon">🏠</span> Inicio
+        </button>
+        <button class="nav-btn" onclick="irPagina('skins',this)">
+            <span class="icon">🎭</span> Guerreros
+        </button>
+        <button class="nav-btn" onclick="irPagina('ranking',this)">
+            <span class="icon">🏆</span> Rankings
+        </button>
+        <button class="nav-btn" onclick="irPagina('historial',this)">
+            <span class="icon">📜</span> Historial
+        </button>
+
+        <div class="sidebar-bottom">
+            <div class="online-count" id="onlineCount">
+                <div class="online-dot"></div>
+                <span id="onlineNum">0</span> en línea
+            </div>
+            <button class="nav-btn" onclick="logout()">
+                <span class="icon">🚪</span> Salir
+            </button>
+        </div>
+    </div>
+
+    <!-- Contenido principal -->
+    <div class="main">
+
+        <!-- ── INICIO ───────────────────────────────────────────────── -->
+        <div class="page active" id="pageInicio">
+            <div class="page-header">
+                <h1>¡Bienvenido, <span id="headerNombre">Guerrero</span>! ⚔️</h1>
+                <p>El Quinto Sol necesita un campeón. ¿Estás listo para la batalla?</p>
+            </div>
+
+            <!-- Botón jugar -->
+            <div class="play-section">
+                <h2>🏛️ ENTRAR AL TEMPLO</h2>
+                <p>Mapa aleatorio · 2–8 jugadores · Tiempo límite 5 min</p>
+                <button class="btn-play" id="btnJugar" onclick="buscarPartida()">
+                    ⚔️ JUGAR
+                </button>
+                <div class="cola-status" id="colaStatus" style="display:none">
+                    <div class="cola-dot"></div>
+                    <span id="colaTexto">Buscando batalla...</span>
+                    <button class="btn-cancelar" onclick="cancelarBusqueda()">Cancelar</button>
+                </div>
+            </div>
+
+            <!-- Stats rápidas -->
+            <div class="cards-grid" id="statsGrid">
+                <div class="stat-card">
+                    <div class="sc-icon">⚔️</div>
+                    <div class="sc-val" id="statKills">0</div>
+                    <div class="sc-lbl">Bajas totales</div>
+                </div>
+                <div class="stat-card">
+                    <div class="sc-icon">💀</div>
+                    <div class="sc-val" id="statMuertes">0</div>
+                    <div class="sc-lbl">Muertes</div>
+                </div>
+                <div class="stat-card">
+                    <div class="sc-icon">🎮</div>
+                    <div class="sc-val" id="statPartidas">0</div>
+                    <div class="sc-lbl">Partidas jugadas</div>
+                </div>
+                <div class="stat-card">
+                    <div class="sc-icon">🏆</div>
+                    <div class="sc-val" id="statGanadas">0</div>
+                    <div class="sc-lbl">Victorias</div>
+                </div>
+                <div class="stat-card">
+                    <div class="sc-icon">🪙</div>
+                    <div class="sc-val" id="statMonedas">0</div>
+                    <div class="sc-lbl">Monedas</div>
+                </div>
+                <div class="stat-card">
+                    <div class="sc-icon">📊</div>
+                    <div class="sc-val" id="statKD">0.00</div>
+                    <div class="sc-lbl">K/D Ratio</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── SKINS ────────────────────────────────────────────────── -->
+        <div class="page" id="pageSkins">
+            <div class="page-header">
+                <h1>🎭 Guerreros</h1>
+                <p>Desbloquea nuevos guerreros con tus monedas</p>
+            </div>
+            <div class="skins-grid" id="skinsGrid"></div>
+        </div>
+
+        <!-- ── RANKING ──────────────────────────────────────────────── -->
+        <div class="page" id="pageRanking">
+            <div class="page-header">
+                <h1>🏆 Rankings Globales</h1>
+                <p>Los guerreros más letales del Quinto Sol</p>
+            </div>
+            <div class="ranking-tabs">
+                <button class="rtab active" onclick="cargarRanking('puntos',this)">⚔️ Puntos</button>
+                <button class="rtab" onclick="cargarRanking('kd',this)">📊 K/D Ratio</button>
+            </div>
+            <table class="ranking-table" id="rankingTable">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Guerrero</th>
+                        <th>Nivel</th>
+                        <th>Bajas</th>
+                        <th>K/D</th>
+                        <th>Victorias</th>
+                    </tr>
+                </thead>
+                <tbody id="rankingBody"></tbody>
+            </table>
+        </div>
+
+        <!-- ── HISTORIAL ────────────────────────────────────────────── -->
+        <div class="page" id="pageHistorial">
+            <div class="page-header">
+                <h1>📜 Historial de Batallas</h1>
+                <p>Tus últimas 20 partidas</p>
+            </div>
+            <div class="historial-list" id="historialList"></div>
+        </div>
+    </div>
+
+    <!-- Navbar móvil -->
+    <div class="mobile-nav">
+        <button class="mobile-nav-btn active" onclick="irPagina('inicio',this)">🏠<span>Inicio</span></button>
+        <button class="mobile-nav-btn" onclick="irPagina('skins',this)">🎭<span>Skins</span></button>
+        <button class="mobile-nav-btn" onclick="irPagina('ranking',this)">🏆<span>Ranking</span></button>
+        <button class="mobile-nav-btn" onclick="irPagina('historial',this)">📜<span>Historial</span></button>
+    </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/lobby.js"></script>
+<script>
+if('serviceWorker' in navigator)
+    navigator.serviceWorker.register('/sw.js').catch(()=>{});
+</script>
+</body>
+</html>
