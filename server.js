@@ -120,53 +120,43 @@ function generarMapa(tipo) {
 }
 
 // ─── MATCHMAKING ─────────────────────────────────────────────────────────────
-function generarNPCs(mapa, cantidad, salaId) {
-    const nombres = ['Cortés','Alvarado','Narváez','Velázquez','Sandoval','Olid','Montejo','Portocarrero'];
-    const npcs = {};
-    for (let i = 0; i < cantidad; i++) {
-        const spawn = mapa.spawns[(i + 1) % mapa.spawns.length];
-        const id = `npc_${salaId}_${i}`;
-        // Spawn en centro exacto del tile para evitar colisiones
-        let spawnX = spawn.x * 64 + 32, spawnY = spawn.y * 64 + 32;
-        // Buscar tile libre si el spawn está ocupado
-        for (let tries = 0; tries < 50; tries++) {
-            const tx = Math.floor(spawnX/64), ty = Math.floor(spawnY/64);
-            if (ty>=0&&ty<mapa.alto&&tx>=0&&tx<mapa.ancho&&mapa.tiles[ty][tx]===0) break;
-            spawnX = (1 + Math.floor(Math.random()*(mapa.ancho-2))) * 64 + 32;
-            spawnY = (1 + Math.floor(Math.random()*(mapa.alto-2))) * 64 + 32;
-        }
-        npcs[id] = {
-            id, esNPC: true,
-            nombre: nombres[i % nombres.length],
-            skin: 'conquistador',
-            x: spawnX,
-            y: spawnY,
-            angle: Math.random() * Math.PI * 2,
-            hp: 100, maxHp: 100, vivo: true,
-            arma: 0, kills: 0, muertes: 0, monedas: 0,
-            estado: 'patrullar',
-            aiTimer: 2 + Math.random() * 2,
-            timerDisparo: 2 + Math.random() * 2,
-            timerCambio: 2 + Math.random() * 3,
-            strafeDir: Math.random() > 0.5 ? 1 : -1,
-            burstCount: 0, burstTimer: 0, retreatTimer: 0,
-            squadRole: i % 4,
-            alertedBy: null,
-            walkCycle: Math.random() * Math.PI * 2
-        };
+
+// ── Constantes de IA (equivalentes al C) ──────────────────────────────────
+const NPC_RADIO          = 20.0;   // ENEMY_RADIUS del C
+const NPC_ALERT_DIST     = 600.0;  // alertDistance base
+const NPC_SPD            = 2.2;    // velocidad base
+const DT                 = 0.1;    // paso de simulación (100 ms)
+
+// Estados de IA — mirror exacto del enum AIState del C
+const AI_PATROL  = 'patrullar';
+const AI_CHASE   = 'perseguir';
+const AI_STRAFE  = 'strafear';    // en el C: AI_STRAFE  (antes llamado "flanquear" sin posición objetivo)
+const AI_RETREAT = 'retroceder';
+const AI_SHOOT   = 'disparar';
+const AI_FLANK   = 'flanquear';   // en el C: AI_FLANK   (posición objetivo calculada)
+const AI_PINCER  = 'pincer';      // en el C: AI_PINCER  (faltaba completamente)
+
+// ── hasLOS: línea de visión real (igual que el C) ─────────────────────────
+function hasLOS(mapa, x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const d  = Math.sqrt(dx*dx + dy*dy);
+    if (d < 1) return true;
+    const nx = dx/d, ny = dy/d;
+    // Pasos de 10 unidades, igual que el C
+    for (let t = 10; t < d; t += 10) {
+        const cx = Math.floor((x1 + nx*t) / 64);
+        const cy = Math.floor((y1 + ny*t) / 64);
+        if (cy < 0 || cy >= mapa.alto || cx < 0 || cx >= mapa.ancho) return false;
+        if (mapa.tiles[cy][cx] !== 0) return false;
     }
-    return npcs;
+    return true;
 }
 
-function colisionNPC(mapa, x, y, radio) {
-    const r = radio || 18;
-    // Primero verificar el tile central
-    const ctx2 = Math.floor(x/64), cty = Math.floor(y/64);
-    if (cty < 0 || cty >= mapa.alto || ctx2 < 0 || ctx2 >= mapa.ancho) return true;
-    if (mapa.tiles[cty][ctx2] !== 0) return true;
-    // Luego las esquinas con radio reducido
-    const checks = [[x+r,y],[x-r,y],[x,y+r],[x,y-r]];
-    for (const [cx,cy] of checks) {
+// ── Colisión con radio AABB (4 esquinas, igual que checkCollisionR del C) ──
+function colisionNPC(mapa, x, y, r) {
+    const radio = r || NPC_RADIO;
+    const corners = [[x+radio, y+radio],[x-radio, y+radio],[x+radio, y-radio],[x-radio, y-radio]];
+    for (const [cx, cy] of corners) {
         const tx = Math.floor(cx/64), ty = Math.floor(cy/64);
         if (ty < 0 || ty >= mapa.alto || tx < 0 || tx >= mapa.ancho) return true;
         if (mapa.tiles[ty][tx] !== 0) return true;
@@ -174,21 +164,75 @@ function colisionNPC(mapa, x, y, radio) {
     return false;
 }
 
-function dispararNPC(sala, io, npc, id, aimAngle) {
-    const spread = (Math.random() - 0.5) * 0.25;
-    const ang = aimAngle + spread;
+// ── Generación de NPCs ────────────────────────────────────────────────────
+function generarNPCs(mapa, cantidad, salaId) {
+    const nombres = ['Cortés','Alvarado','Narváez','Velázquez','Sandoval','Olid','Montejo','Portocarrero'];
+    const npcs = {};
+
+    for (let i = 0; i < cantidad; i++) {
+        const id = `npc_${salaId}_${i}`;
+
+        // Buscar posición libre lejos del centro del mapa
+        let spawnX, spawnY;
+        let tries = 0;
+        do {
+            spawnX = (1 + Math.floor(Math.random() * (mapa.ancho - 2))) * 64 + 32;
+            spawnY = (1 + Math.floor(Math.random() * (mapa.alto  - 2))) * 64 + 32;
+            tries++;
+        } while (colisionNPC(mapa, spawnX, spawnY, NPC_RADIO) && tries < 100);
+
+        npcs[id] = {
+            id,
+            esNPC: true,
+            nombre: nombres[i % nombres.length],
+            skin: 'conquistador',
+            x: spawnX,
+            y: spawnY,
+            angle: Math.random() * Math.PI * 2,
+            hp: 100, maxHp: 100,
+            vivo: true,
+            arma: 0, kills: 0, muertes: 0, monedas: 0,
+
+            // IA — mismos campos que el struct Enemy del C
+            estado:       AI_PATROL,
+            aiTimer:      2.0 + Math.random() * 2.0,
+            coordTimer:   0,                          // ← nuevo (coordTimer del C)
+            moveTimer:    0,                          // ← nuevo (moveTimer del C)
+            stuckTimer:   0,                          // ← nuevo (stuckTimer del C)
+            lastValidX:   spawnX,                     // ← nuevo (lastValidX del C)
+            lastValidY:   spawnY,                     // ← nuevo (lastValidY del C)
+            timerDisparo: 2.0 + Math.random() * 2.0,
+            strafeDir:    Math.random() > 0.5 ? 1 : -1,
+            burstCount:   0,
+            burstTimer:   0,
+            retreatTimer: 0,
+            squadRole:    i % 4,                      // roles 0,1,2,3 como en el C
+            alertedBy:    null,
+            flankAngle:   (i % 4) * (Math.PI / 2),   // ← nuevo (flankAngle del C)
+            walkCycle:    Math.random() * Math.PI * 2,
+            alertDistance: NPC_ALERT_DIST
+        };
+    }
+    return npcs;
+}
+
+// ── Disparo de NPC (con detección de hit en jugadores) ───────────────────
+function dispararNPC(sala, io, npc, id, aimAngle, spread = 0.12) {
+    const sp = (Math.random() - 0.5) * spread;
+    const ang = aimAngle + sp;
     io.to(sala.id).emit('bala_creada', {
-        id: `nb_${id}_${Date.now()}`,
-        x: npc.x, y: npc.y,
-        dx: Math.cos(ang) * 10,
-        dy: Math.sin(ang) * 10,
+        id:  `nb_${id}_${Date.now()}`,
+        x:   npc.x, y: npc.y,
+        dx:  Math.cos(ang) * 10,
+        dy:  Math.sin(ang) * 10,
         fromId: id, fromNPC: true,
         danio: 10, vida: 2.5
     });
+    // Hit detection inmediato para jugadores cercanos (igual que el C)
     for (const [sid, jug] of sala.jugadores) {
         if (!jug.vivo) continue;
         const dx = jug.x - npc.x, dy = jug.y - npc.y;
-        if (Math.sqrt(dx*dx+dy*dy) < 40) {
+        if (Math.sqrt(dx*dx + dy*dy) < 40) {
             jug.hp -= 10;
             io.to(sala.id).emit('jugador_recibio_danio', { id: sid, hp: jug.hp, fromId: id, danio: 10 });
             if (jug.hp <= 0) {
@@ -196,8 +240,9 @@ function dispararNPC(sala, io, npc, id, aimAngle) {
                 io.to(sala.id).emit('jugador_murio', { id: sid, matadoPor: id, kills: npc.kills, muertes: jug.muertes });
                 setTimeout(() => {
                     if (!salas.has(sala.id)) return;
-                    const spawn = sala.mapa.spawns[Math.floor(Math.random()*sala.mapa.spawns.length)];
-                    jug.x = spawn.x*64; jug.y = spawn.y*64; jug.hp = jug.maxHp; jug.vivo = true;
+                    const spawn = sala.mapa.spawns[Math.floor(Math.random() * sala.mapa.spawns.length)];
+                    jug.x = spawn.x * 64; jug.y = spawn.y * 64;
+                    jug.hp = jug.maxHp; jug.vivo = true;
                     io.to(sala.id).emit('jugador_respawn', { id: sid, x: jug.x, y: jug.y, hp: jug.hp });
                 }, 5000);
             }
@@ -205,138 +250,282 @@ function dispararNPC(sala, io, npc, id, aimAngle) {
     }
 }
 
+// ── Loop principal de IA — equivalente a updateEnemies() del C ────────────
 function actualizarNPCs(sala, io) {
     if (!sala.npcs || Object.keys(sala.npcs).length === 0) return;
     const mapa = sala.mapa;
-    const DT = 0.1;
 
-    // FASE 1: alertas compartidas
+    // ── FASE 1: Compartir alertas (igual que el C) ─────────────────────────
     for (const id in sala.npcs) {
-        const npc = sala.npcs[id];
-        if (!npc.vivo) continue;
-        let minDist = 999999;
-        for (const [,jug] of sala.jugadores) {
+        const ei = sala.npcs[id];
+        if (!ei.vivo) continue;
+
+        // Encontrar jugador más cercano visible
+        let minDist = Infinity;
+        for (const [, jug] of sala.jugadores) {
             if (!jug.vivo) continue;
-            const dx = jug.x-npc.x, dy = jug.y-npc.y;
-            const d = Math.sqrt(dx*dx+dy*dy);
+            const dx = jug.x - ei.x, dy = jug.y - ei.y;
+            const d = Math.sqrt(dx*dx + dy*dy);
             if (d < minDist) minDist = d;
         }
-        if (minDist < 500 && npc.estado === 'patrullar') {
+
+        // Si este NPC ve al jugador, alerta a los cercanos
+        const iSees = minDist < ei.alertDistance && (() => {
+            for (const [, jug] of sala.jugadores) {
+                if (!jug.vivo) continue;
+                if (hasLOS(mapa, ei.x, ei.y, jug.x, jug.y)) return true;
+            }
+            return false;
+        })();
+
+        if (iSees) {
             for (const id2 in sala.npcs) {
                 if (id2 === id) continue;
-                const n2 = sala.npcs[id2];
-                if (!n2.vivo || n2.estado !== 'patrullar') continue;
-                const dij = Math.sqrt((npc.x-n2.x)**2+(npc.y-n2.y)**2);
+                const ej = sala.npcs[id2];
+                if (!ej.vivo || ej.estado !== AI_PATROL) continue;
+                const dij = Math.sqrt((ei.x - ej.x)**2 + (ei.y - ej.y)**2);
                 if (dij < 300) {
-                    n2.estado = (n2.squadRole===1||n2.squadRole===2) ? 'flanquear' : 'perseguir';
-                    n2.aiTimer = 1.5; n2.alertedBy = id;
+                    // roles 1 y 2 → flanquean; roles 0 y 3 → persiguen
+                    ej.estado    = (ej.squadRole === 1 || ej.squadRole === 2) ? AI_FLANK : AI_CHASE;
+                    ej.aiTimer   = 1.5;
+                    ej.alertedBy = id;
                 }
             }
         }
     }
 
-    // FASE 2: actualizar cada NPC
+    // ── FASE 2: Actualizar cada NPC ───────────────────────────────────────
     for (const id in sala.npcs) {
         const npc = sala.npcs[id];
         if (!npc.vivo) continue;
 
-        let minDist = 999999, targetX = null, targetY = null;
-        for (const [,jug] of sala.jugadores) {
+        // Jugador objetivo más cercano CON línea de visión
+        let minDist = Infinity, targetX = null, targetY = null;
+        for (const [, jug] of sala.jugadores) {
             if (!jug.vivo) continue;
-            const dx = jug.x-npc.x, dy = jug.y-npc.y;
-            const d = Math.sqrt(dx*dx+dy*dy);
+            const dx = jug.x - npc.x, dy = jug.y - npc.y;
+            const d  = Math.sqrt(dx*dx + dy*dy);
             if (d < minDist) { minDist = d; targetX = jug.x; targetY = jug.y; }
         }
 
-        const canSee = targetX !== null && minDist < 600;
-        const toPlayerAngle = targetX !== null ? Math.atan2(targetY-npc.y, targetX-npc.x) : npc.angle;
+        // canSee usa hasLOS — igual que el C
+        const canSee = targetX !== null
+            && minDist < npc.alertDistance
+            && hasLOS(mapa, npc.x, npc.y, targetX, targetY);
 
-        npc.aiTimer -= DT;
-        npc.timerDisparo -= DT;
-        npc.walkCycle += DT * 4;
+        const toPlayerAngle = targetX !== null
+            ? Math.atan2(targetY - npc.y, targetX - npc.x)
+            : npc.angle;
 
-        // Transiciones de estado
+        npc.aiTimer    -= DT;
+        npc.coordTimer -= DT;
+        npc.walkCycle  += DT * 4;
+
+        // ── Transiciones de estado (espejo exacto del C) ──────────────────
         if (canSee) {
-            if (minDist < 100 && npc.estado !== 'retroceder') {
-                npc.estado = 'retroceder'; npc.retreatTimer = 1.2;
+            if (minDist < 120 && npc.estado !== AI_RETREAT) {
+                npc.estado       = AI_RETREAT;
+                npc.retreatTimer = 1.2;
             } else if (npc.aiTimer <= 0) {
-                const r = Math.random() * 100;
+                const rr = Math.floor(Math.random() * 100);
+
                 if (npc.squadRole === 0) {
-                    if (r<40)      { npc.estado='disparar'; npc.burstCount=3; npc.burstTimer=0; }
-                    else if (r<70) { npc.estado='perseguir'; }
-                    else           { npc.estado='flanquear'; npc.strafeDir=Math.random()>.5?1:-1; }
-                    npc.aiTimer = 1.5;
-                } else if (npc.squadRole===1||npc.squadRole===2) {
-                    if (r<50)      { npc.estado='flanquear'; }
-                    else if (r<75) { npc.estado='disparar'; npc.burstCount=2; npc.burstTimer=0; }
-                    else           { npc.estado='perseguir'; }
-                    npc.aiTimer = 1.2;
+                    // Líder: dispara en bursts, persigue, o strafea
+                    if      (rr < 40) { npc.estado = AI_SHOOT;  npc.aiTimer = 1.5; npc.burstCount = 3 + (Math.random() > 0.5 ? 1 : 0); npc.burstTimer = 0; }
+                    else if (rr < 70) { npc.estado = AI_CHASE;  npc.aiTimer = 0.8; }
+                    else              { npc.estado = AI_STRAFE; npc.aiTimer = 1.0; npc.strafeDir = Math.random() > 0.5 ? 1 : -1; }
+                } else if (npc.squadRole === 1 || npc.squadRole === 2) {
+                    // Flanqueadores: flanquean con posición objetivo, o disparan
+                    if      (rr < 50) { npc.estado = AI_FLANK;  npc.aiTimer = 1.2; }
+                    else if (rr < 75) { npc.estado = AI_SHOOT;  npc.aiTimer = 1.0; npc.burstCount = 2; npc.burstTimer = 0; }
+                    else              { npc.estado = AI_STRAFE; npc.aiTimer = 0.8; npc.strafeDir = npc.squadRole === 1 ? 1 : -1; }
                 } else {
-                    if (r<60)      { npc.estado='disparar'; npc.burstCount=2; npc.burstTimer=0; }
-                    else           { npc.estado='perseguir'; }
-                    npc.aiTimer = 2.0;
+                    // Role 3: Pincer — rodea al jugador desde el lado opuesto al líder
+                    if      (rr < 35) { npc.estado = AI_PINCER; npc.aiTimer = 1.5; }
+                    else if (rr < 60) { npc.estado = AI_SHOOT;  npc.aiTimer = 1.2; npc.burstCount = 2; npc.burstTimer = 0; }
+                    else              { npc.estado = AI_CHASE;  npc.aiTimer = 0.7; }
                 }
             }
-        } else if (!canSee && npc.aiTimer <= 0 && npc.estado !== 'patrullar') {
-            npc.estado = 'patrullar'; npc.aiTimer = 3; npc.alertedBy = null;
+        } else if (npc.aiTimer <= 0 && npc.estado !== AI_PATROL) {
+            npc.estado    = AI_PATROL;
+            npc.aiTimer   = 3.0;
+            npc.alertedBy = null;
         }
 
+        // ── Comportamiento por estado (espejo del switch del C) ───────────
         let moveX = 0, moveY = 0;
-        const spd = 2.2;
 
         switch (npc.estado) {
-            case 'patrullar':
-                npc.timerCambio -= DT;
-                if (npc.timerCambio <= 0) { npc.angle=Math.random()*Math.PI*2; npc.timerCambio=2+Math.random()*3; }
-                moveX = Math.cos(npc.angle)*spd*0.5; moveY = Math.sin(npc.angle)*spd*0.5;
-                break;
-            case 'perseguir':
-                npc.angle = toPlayerAngle;
-                moveX = Math.cos(npc.angle)*spd; moveY = Math.sin(npc.angle)*spd;
-                if (npc.timerDisparo<=0 && minDist<400) { npc.timerDisparo=1.8; dispararNPC(sala,io,npc,id,toPlayerAngle); }
-                break;
-            case 'flanquear': {
-                npc.angle = toPlayerAngle;
-                const perp = toPlayerAngle + Math.PI/2 * npc.strafeDir;
-                moveX = Math.cos(perp)*spd*0.9; moveY = Math.sin(perp)*spd*0.9;
-                if (npc.timerDisparo<=0 && minDist<350) { npc.timerDisparo=1.5; dispararNPC(sala,io,npc,id,toPlayerAngle); }
+
+            case AI_PATROL: {
+                // Patrulla aleatoria — moveTimer controla cambio de ángulo
+                npc.moveTimer += DT;
+                if (npc.moveTimer > 2.5) {
+                    npc.angle     = Math.random() * Math.PI * 2;
+                    npc.moveTimer = 0;
+                }
+                moveX = Math.cos(npc.angle) * NPC_SPD * 0.5;
+                moveY = Math.sin(npc.angle) * NPC_SPD * 0.5;
                 break;
             }
-            case 'retroceder':
-                npc.retreatTimer -= DT; npc.angle = toPlayerAngle;
-                moveX = Math.cos(toPlayerAngle+Math.PI)*spd*1.1; moveY = Math.sin(toPlayerAngle+Math.PI)*spd*1.1;
-                if (npc.timerDisparo<=0) { npc.timerDisparo=1.0; dispararNPC(sala,io,npc,id,toPlayerAngle); }
-                if (npc.retreatTimer<=0) { npc.estado='flanquear'; npc.aiTimer=1.0; }
+
+            case AI_CHASE: {
+                // Persecución directa
+                npc.angle = toPlayerAngle;
+                moveX = Math.cos(npc.angle) * NPC_SPD;
+                moveY = Math.sin(npc.angle) * NPC_SPD;
                 break;
-            case 'disparar':
+            }
+
+            case AI_STRAFE: {
+                // Strafeo perpendicular mientras dispara — igual que AI_STRAFE del C
+                npc.angle = toPlayerAngle;
+                const perpS = toPlayerAngle + Math.PI / 2 * npc.strafeDir;
+                moveX = Math.cos(perpS) * NPC_SPD * 0.9;
+                moveY = Math.sin(perpS) * NPC_SPD * 0.9;
+                npc.timerDisparo -= DT;
+                if (npc.timerDisparo <= 0) {
+                    dispararNPC(sala, io, npc, id, toPlayerAngle, 0.12);
+                    npc.timerDisparo = 1.8;
+                }
+                break;
+            }
+
+            case AI_RETREAT: {
+                // Retrocede mientras dispara — igual que AI_RETREAT del C
+                const awayAngle = toPlayerAngle + Math.PI;
+                moveX = Math.cos(awayAngle) * NPC_SPD * 1.1;
+                moveY = Math.sin(awayAngle) * NPC_SPD * 1.1;
+                npc.angle = toPlayerAngle;
+                npc.retreatTimer -= DT;
+                npc.timerDisparo -= DT;
+                if (npc.timerDisparo <= 0) {
+                    dispararNPC(sala, io, npc, id, toPlayerAngle, 0.18);
+                    npc.timerDisparo = 1.0;
+                }
+                if (npc.retreatTimer <= 0) {
+                    npc.estado    = AI_STRAFE;
+                    npc.aiTimer   = 1.0;
+                    npc.strafeDir = Math.random() > 0.5 ? 1 : -1;
+                }
+                break;
+            }
+
+            case AI_SHOOT: {
+                // Dispara en burst con micro-dodge lateral — igual que AI_SHOOT del C
                 npc.angle = toPlayerAngle;
                 npc.burstTimer -= DT;
-                if (npc.burstTimer<=0 && npc.burstCount>0) { npc.burstCount--; npc.burstTimer=0.2; dispararNPC(sala,io,npc,id,toPlayerAngle); }
-                moveX = Math.cos(toPlayerAngle+Math.PI/2)*Math.sin(npc.walkCycle)*spd*0.3;
-                moveY = Math.sin(toPlayerAngle+Math.PI/2)*Math.sin(npc.walkCycle)*spd*0.3;
+                if (npc.burstTimer <= 0 && npc.burstCount > 0) {
+                    dispararNPC(sala, io, npc, id, toPlayerAngle, 0.10);
+                    npc.burstCount--;
+                    npc.burstTimer = 0.18;
+                }
+                // Micro-dodge sinusoidal (igual que el C: dodge = sin(gameTime*8+i)*speed*0.3)
+                const dodge = Math.sin(Date.now() * 0.008 + parseInt(id.split('_').pop())) * NPC_SPD * 0.3;
+                moveX = Math.cos(toPlayerAngle + Math.PI / 2) * dodge;
+                moveY = Math.sin(toPlayerAngle + Math.PI / 2) * dodge;
                 break;
-        }
+            }
 
-        // Separación entre NPCs
-        for (const id2 in sala.npcs) {
-            if (id2===id) continue;
-            const n2=sala.npcs[id2]; if (!n2.vivo) continue;
-            const dij=Math.sqrt((npc.x-n2.x)**2+(npc.y-n2.y)**2);
-            if (dij<50&&dij>0.1) {
-                const pa=Math.atan2(npc.y-n2.y,npc.x-n2.x), push=(50-dij)/50*spd*0.5;
-                moveX+=Math.cos(pa)*push; moveY+=Math.sin(pa)*push;
+            case AI_FLANK: {
+                // Flanqueo con POSICIÓN OBJETIVO calculada — igual que AI_FLANK del C
+                npc.angle = toPlayerAngle;
+                const flankOff    = (npc.squadRole === 1) ? Math.PI / 3 : -Math.PI / 3;
+                const targetAngle = toPlayerAngle + flankOff;
+                const approachDist = 200.0;
+                // Punto objetivo: 200 unidades del jugador, desviado 60°
+                const tx = targetX + Math.cos(targetAngle + Math.PI) * approachDist;
+                const ty = targetY + Math.sin(targetAngle + Math.PI) * approachDist;
+                const toTargetA = Math.atan2(ty - npc.y, tx - npc.x);
+                moveX = Math.cos(toTargetA) * NPC_SPD * 1.1;
+                moveY = Math.sin(toTargetA) * NPC_SPD * 1.1;
+                npc.timerDisparo -= DT;
+                if (npc.timerDisparo <= 0 && canSee) {
+                    dispararNPC(sala, io, npc, id, toPlayerAngle, 0.15);
+                    npc.timerDisparo = 2.0;
+                }
+                break;
+            }
+
+            case AI_PINCER: {
+                // Pincer: busca al líder (role 0) y se coloca en el lado OPUESTO al jugador
+                // Igual que AI_PINCER del C
+                let leaderX = targetX, leaderY = targetY;
+                for (const id2 in sala.npcs) {
+                    const n2 = sala.npcs[id2];
+                    if (!n2.vivo || n2.squadRole !== 0 || id2 === id) continue;
+                    const dij = Math.sqrt((n2.x - npc.x)**2 + (n2.y - npc.y)**2);
+                    if (dij < 400) { leaderX = n2.x; leaderY = n2.y; break; }
+                }
+                const leaderAngle  = Math.atan2(leaderY - targetY, leaderX - targetX);
+                const pincerAngle  = leaderAngle + Math.PI;
+                const ptx = targetX + Math.cos(pincerAngle) * 180;
+                const pty = targetY + Math.sin(pincerAngle) * 180;
+                const toTA = Math.atan2(pty - npc.y, ptx - npc.x);
+                moveX = Math.cos(toTA) * NPC_SPD * 1.2;
+                moveY = Math.sin(toTA) * NPC_SPD * 1.2;
+                npc.angle = toPlayerAngle;
+                npc.timerDisparo -= DT;
+                if (npc.timerDisparo <= 0 && canSee) {
+                    dispararNPC(sala, io, npc, id, toPlayerAngle, 0.12);
+                    npc.timerDisparo = 1.5;
+                }
+                break;
             }
         }
 
-        // Mover con colisión por ejes independientes
-        if (moveX!==0||moveY!==0) {
-            if (!colisionNPC(mapa,npc.x+moveX,npc.y+moveY,20))      { npc.x+=moveX; npc.y+=moveY; }
-            else if (!colisionNPC(mapa,npc.x+moveX,npc.y,20))        { npc.x+=moveX; }
-            else if (!colisionNPC(mapa,npc.x,npc.y+moveY,20))        { npc.y+=moveY; }
-            else { npc.angle += Math.PI/2+(Math.random()-0.5); }
+        // ── Separación entre NPCs (igual que el C: radio 2.5×) ───────────
+        for (const id2 in sala.npcs) {
+            if (id2 === id) continue;
+            const n2 = sala.npcs[id2];
+            if (!n2.vivo) continue;
+            const dij = Math.sqrt((npc.x - n2.x)**2 + (npc.y - n2.y)**2);
+            const sep = NPC_RADIO * 2.5;
+            if (dij < sep && dij > 0.1) {
+                const pushA = Math.atan2(npc.y - n2.y, npc.x - n2.x);
+                const push  = (sep - dij) / sep * NPC_SPD * 0.5;
+                moveX += Math.cos(pushA) * push;
+                moveY += Math.sin(pushA) * push;
+            }
         }
 
-        io.to(sala.id).emit('jugador_movio', { id, x: npc.x, y: npc.y, angle: npc.angle, arma: 0 });
+        // ── Movimiento con colisión por ejes independientes + stuckTimer ──
+        // Equivalente exacto del FIX v15 del C
+        if (moveX !== 0 || moveY !== 0) {
+            const nx2 = npc.x + moveX, ny2 = npc.y + moveY;
+
+            if (!colisionNPC(mapa, nx2, ny2, NPC_RADIO)) {
+                // Movimiento completo
+                npc.x = nx2; npc.y = ny2;
+                npc.lastValidX = nx2; npc.lastValidY = ny2;
+                npc.stuckTimer = 0;
+            } else if (!colisionNPC(mapa, nx2, npc.y, NPC_RADIO)) {
+                // Solo eje X
+                npc.x = nx2;
+                npc.lastValidX = nx2;
+                npc.stuckTimer = 0;
+            } else if (!colisionNPC(mapa, npc.x, ny2, NPC_RADIO)) {
+                // Solo eje Y
+                npc.y = ny2;
+                npc.lastValidY = ny2;
+                npc.stuckTimer = 0;
+            } else {
+                // Completamente bloqueado — acumular stuckTimer y girar
+                npc.stuckTimer += DT;
+                if (npc.stuckTimer > 0.5) {
+                    npc.angle += 1.2 + Math.random() * 1.8;
+                    npc.stuckTimer = 0;
+                }
+            }
+
+            // Garantía final: si de algún modo está en pared, volver a última posición válida
+            if (colisionNPC(mapa, npc.x, npc.y, NPC_RADIO - 2)) {
+                npc.x = npc.lastValidX;
+                npc.y = npc.lastValidY;
+            }
+        }
+
+        io.to(sala.id).emit('jugador_movio', { id, x: npc.x, y: npc.y, angle: npc.angle, arma: 0, estado: npc.estado });
     }
 }
 
@@ -538,22 +727,20 @@ io.on('connection', (socket) => {
             salaEnCurso.jugadores.set(socket.id, jugadorEnSala);
             socket.join(salaEnCurso.id);
             socket.data.salaId = salaEnCurso.id;
+            // Incluir monedas activas y NPCs en el payload — fix: antes se perdian
             socket.emit('partida_iniciada', {
                 salaId: salaEnCurso.id,
                 mapa: { tiles: salaEnCurso.mapa.tiles, ancho: salaEnCurso.mapa.ancho, alto: salaEnCurso.mapa.alto },
                 tipoMapa: salaEnCurso.tipoMapa,
                 jugadores: Object.fromEntries(salaEnCurso.jugadores),
                 tuId: socket.id,
-                tiempoTotal: TIEMPO_PARTIDA
+                tiempoTotal: TIEMPO_PARTIDA,
+                npcs: salaEnCurso.npcs || {},
+                monedas: Object.fromEntries(salaEnCurso.monedas)
             });
-            // Notificar NPCs al nuevo jugador
-            if (salaEnCurso.npcs && Object.keys(salaEnCurso.npcs).length > 0) {
-                socket.emit('npcs_spawned', salaEnCurso.npcs);
-            }
-            // Avisar a los demás del nuevo jugador
+            // Avisar a los demas del nuevo jugador
             socket.to(salaEnCurso.id).emit('jugador_unido', { id: socket.id, ...jugadorEnSala });
-            showToast && showToast(`${j.nombre} se unió a la batalla`);
-            console.log(`⚔️ ${j.nombre} se unió a sala en curso ${salaEnCurso.id}`);
+            console.log(`⚔️ ${j.nombre} se unio a sala en curso ${salaEnCurso.id}`);
             return;
         }
 

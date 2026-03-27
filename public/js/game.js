@@ -223,10 +223,11 @@ function conectarSocket(token, salaId) {
         socket.data = { salaId };
     });
 
-    socket.on('jugador_movio', ({ id, x, y, angle, arma }) => {
-        if (!jugadores[id]) jugadores[id] = { nombre: id.startsWith('npc_') ? id.split('_')[2]||'NPC' : id, vivo: true, hp: 100, maxHp: 100, esNPC: id.startsWith('npc_'), skin: 'jaguar' };
+    socket.on('jugador_movio', ({ id, x, y, angle, arma, estado }) => {
+        if (!jugadores[id]) jugadores[id] = { nombre: id.startsWith('npc_') ? id.split('_')[2]||'NPC' : id, vivo: true, hp: 100, maxHp: 100, esNPC: id.startsWith('npc_'), skin: 'conquistador' };
         jugadores[id].x = x; jugadores[id].y = y;
         jugadores[id].angle = angle; jugadores[id].arma = arma;
+        if (estado !== undefined) jugadores[id].estado = estado;
     });
 
     socket.on('npcs_spawned', (npcs) => {
@@ -922,12 +923,23 @@ function renderMinimap() {
         mmCtx.fillStyle=colors[t]||'#555';
         mmCtx.fillRect(x*ts,y*ts,ts,ts);
     }
-    // Otros jugadores
+    // Otros jugadores y NPCs — colores por estado de IA (igual que el C)
     for(const id in jugadores) {
         if(id===miId||!jugadores[id].vivo) continue;
         const j=jugadores[id];
-        mmCtx.fillStyle='#ff4444';
-        mmCtx.fillRect(j.x/TILE*ts-1.5,j.y/TILE*ts-1.5,3,3);
+        if(j.esNPC) {
+            // Colores según estado de IA — espejo exacto del minimap del C
+            const e = j.estado || 'patrullar';
+            if      (e==='patrullar')  mmCtx.fillStyle='#c85050'; // rojo tenue = patrullando
+            else if (e==='flanquear')  mmCtx.fillStyle='#ff8c00'; // naranja = flanqueando
+            else if (e==='pincer')     mmCtx.fillStyle='#ff00c8'; // magenta = pincer
+            else if (e==='disparar')   mmCtx.fillStyle='#ff3232'; // rojo intenso = disparando
+            else                       mmCtx.fillStyle='#ff0000'; // rojo = persiguiendo/otro
+            mmCtx.fillRect(j.x/TILE*ts-2,j.y/TILE*ts-2,4,4);
+        } else {
+            mmCtx.fillStyle='#44aaff'; // azul = jugador humano
+            mmCtx.fillRect(j.x/TILE*ts-1.5,j.y/TILE*ts-1.5,3,3);
+        }
     }
     // Monedas
     for(const id in monedas) {
