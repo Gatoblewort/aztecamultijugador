@@ -655,11 +655,95 @@ function renderSprites() {
 
 // ── SPRITE JUGADOR PIXELART ───────────────────────────────────────────────
 function dibujarJugador3D(j, drawX, drawY, iw, ih, dist) {
-    const bright=Math.max(.3,1-dist/600);
-    const sk=j.skin||'guerrero_base';
+    const bright = Math.max(.3, 1 - dist/600);
 
-    // Colores por skin (mismos del server)
-    const skinColors={
+    if (j.skin === 'conquistador') {
+        // ── CONQUISTADOR ESPAÑOL (enemigo) ──
+        const sr = 220*bright, sg = 200*bright, sb = 185*bright; // piel clara
+        const arR = 160*bright, arG = 160*bright, arB = 175*bright; // armadura gris acero
+        const arD = 100*bright, arDG = 100*bright, arDB = 115*bright; // sombra armadura
+        const cR  = 180*bright, cG  = 20*bright,  cB  = 20*bright;   // capa roja
+        const hR  = 210*bright, hG  = 205*bright, hB  = 180*bright;  // celada (casco)
+
+        const walkOff = Math.sin(gameTime*8+(j.x+j.y)*.1)*ih*.05;
+
+        // Sombra
+        ctx.fillStyle = `rgba(0,0,0,0.3)`;
+        ctx.fillRect(drawX+iw*.2, drawY+ih-.5, iw*.6, ih*.04);
+
+        // Capa roja (detrás del cuerpo)
+        ctx.fillStyle = `rgb(${cR},${cG},${cB})`;
+        ctx.fillRect(drawX+iw*.1, drawY+ih*.28, iw*.8, ih*.55);
+
+        // Piernas con armadura
+        ctx.fillStyle = `rgb(${arR},${arG},${arB})`;
+        ctx.fillRect(drawX+iw*.2,  drawY+ih*.65, iw*.25, ih*.3+walkOff);
+        ctx.fillRect(drawX+iw*.55, drawY+ih*.65, iw*.25, ih*.3-walkOff);
+        // Botas oscuras
+        ctx.fillStyle = `rgb(${40*bright},${30*bright},${25*bright})`;
+        ctx.fillRect(drawX+iw*.2,  drawY+ih*.87+walkOff,  iw*.25, ih*.08);
+        ctx.fillRect(drawX+iw*.55, drawY+ih*.87-walkOff, iw*.25, ih*.08);
+
+        // Torso — armadura de peto
+        ctx.fillStyle = `rgb(${arR},${arG},${arB})`;
+        ctx.fillRect(drawX+iw*.2, drawY+ih*.3, iw*.6, ih*.35);
+        // Detalle peto (línea central)
+        ctx.fillStyle = `rgb(${arD},${arDG},${arDB})`;
+        ctx.fillRect(drawX+iw*.47, drawY+ih*.32, iw*.06, ih*.3);
+        // Hombros (pauldrons)
+        ctx.fillStyle = `rgb(${arR},${arG},${arB})`;
+        ctx.fillRect(drawX+iw*.08, drawY+ih*.28, iw*.18, ih*.12);
+        ctx.fillRect(drawX+iw*.74, drawY+ih*.28, iw*.18, ih*.12);
+
+        // Brazos
+        ctx.fillStyle = `rgb(${arR},${arG},${arB})`;
+        ctx.fillRect(drawX+iw*.05, drawY+ih*.35, iw*.15, ih*.28);
+        ctx.fillRect(drawX+iw*.8,  drawY+ih*.35, iw*.15, ih*.28);
+        // Manos (guantelete)
+        ctx.fillStyle = `rgb(${arD},${arDG},${arDB})`;
+        ctx.fillRect(drawX+iw*.04, drawY+ih*.6, iw*.16, ih*.08);
+        ctx.fillRect(drawX+iw*.8,  drawY+ih*.6, iw*.16, ih*.08);
+
+        // Espada en mano derecha
+        ctx.fillStyle = `rgb(${190*bright},${195*bright},${210*bright})`;
+        ctx.fillRect(drawX+iw*.84, drawY+ih*.18, iw*.08, ih*.48);
+        ctx.fillStyle = `rgb(${arD},${arDG},${arDB})`;
+        ctx.fillRect(drawX+iw*.78, drawY+ih*.34, iw*.2, ih*.04); // guarda
+
+        // Cabeza — piel
+        ctx.fillStyle = `rgb(${sr},${sg},${sb})`;
+        ctx.fillRect(drawX+iw*.3, drawY+ih*.06, iw*.4, ih*.25);
+        // Barba/bigote
+        ctx.fillStyle = `rgb(${80*bright},${55*bright},${35*bright})`;
+        ctx.fillRect(drawX+iw*.33, drawY+ih*.2, iw*.34, ih*.1);
+
+        // Celada (casco conquistador — abierto con visera)
+        ctx.fillStyle = `rgb(${hR},${hG},${hB})`;
+        ctx.fillRect(drawX+iw*.27, drawY,        iw*.46, ih*.1);   // parte alta
+        ctx.fillRect(drawX+iw*.25, drawY+ih*.08, iw*.5,  ih*.06);  // ala del casco
+        // Cresta del casco (penacho rojo)
+        ctx.fillStyle = `rgb(${200*bright},${20*bright},${20*bright})`;
+        ctx.fillRect(drawX+iw*.42, drawY-ih*.05, iw*.16, ih*.07);
+        // Ojos
+        ctx.fillStyle = '#000';
+        ctx.fillRect(drawX+iw*.34, drawY+ih*.14, iw*.1, ih*.06);
+        ctx.fillRect(drawX+iw*.56, drawY+ih*.14, iw*.1, ih*.06);
+
+        // Barra HP si está herido
+        if (j.hp < 100) {
+            const bw = Math.min(80,iw), bx = Math.floor(drawX+iw/2-bw/2);
+            const by2 = Math.floor(drawY)-10;
+            ctx.fillStyle='#400'; ctx.fillRect(bx,by2,bw,4);
+            const hpPct = Math.max(0,(j.hp||0)/100);
+            ctx.fillStyle=hpPct>.5?'#e63946':hpPct>.25?'#ff6b35':'#cc2222';
+            ctx.fillRect(bx,by2,Math.floor(bw*hpPct),4);
+        }
+        return;
+    }
+
+    // ── GUERRERO AZTECA (jugador humano) ──
+    const sk = j.skin || 'guerrero_base';
+    const skinColors = {
         guerrero_base:  [180,130,70,  80,60,30],
         jaguar:         [140,90,50,  160,120,40],
         aguila:         [200,170,120,220,200,160],
@@ -669,51 +753,39 @@ function dibujarJugador3D(j, drawX, drawY, iw, ih, dist) {
         mictlantecuhtli:[60,20,20,  100,20,20],
         tonatiuh:       [240,160,20, 200,100,0]
     };
-    const c=skinColors[sk]||skinColors['guerrero_base'];
-    const sr=c[0]*bright, sg=c[1]*bright, sb=c[2]*bright;
-    const ar=c[3]*bright, ag=c[4]*bright, ab=c[5]*bright;
+    const c = skinColors[sk]||skinColors['guerrero_base'];
+    const sr2=c[0]*bright, sg2=c[1]*bright, sb2=c[2]*bright;
+    const ar=c[3]*bright,  ag=c[4]*bright,  ab=c[5]*bright;
 
-    const u=iw/10; // unidad de escala
-    ctx.imageSmoothingEnabled=false;
+    ctx.imageSmoothingEnabled = false;
 
-    // Cuerpo (torso)
     ctx.fillStyle=`rgb(${ar},${ag},${ab})`;
     ctx.fillRect(drawX+iw*.2, drawY+ih*.3, iw*.6, ih*.35);
-
-    // Cabeza
-    ctx.fillStyle=`rgb(${sr},${sg},${sb})`;
+    ctx.fillStyle=`rgb(${sr2},${sg2},${sb2})`;
     ctx.fillRect(drawX+iw*.3, drawY+ih*.05, iw*.4, ih*.28);
 
-    // Casco/penacho (distintivo por skin)
-    const penachoColors={
+    const penachoColors = {
         guerrero_base:'#cc4400', jaguar:'#996600', aguila:'#ccaa00',
         sacerdote:'#884488', tlaloc:'#2244cc', quetzalcoatl:'#44cc44',
         mictlantecuhtli:'#440000', tonatiuh:'#ffaa00'
     };
-    ctx.fillStyle=penachoColors[sk]||'#cc4400';
+    ctx.fillStyle = penachoColors[sk]||'#cc4400';
     ctx.fillRect(drawX+iw*.25, drawY, iw*.5, ih*.08);
-    // Plumas del penacho
-    for(let p=0;p<3;p++) {
-        ctx.fillRect(drawX+iw*(.3+p*.15), drawY-ih*.06, iw*.1, ih*.07);
-    }
+    for(let p=0;p<3;p++) ctx.fillRect(drawX+iw*(.3+p*.15), drawY-ih*.06, iw*.1, ih*.07);
 
-    // Piernas
     ctx.fillStyle=`rgb(${ar},${ag},${ab})`;
-    const walkOff=Math.sin(gameTime*8+(j.x+j.y)*.1)*ih*.05;
-    ctx.fillRect(drawX+iw*.2, drawY+ih*.65, iw*.25, ih*.3+walkOff);
-    ctx.fillRect(drawX+iw*.55, drawY+ih*.65, iw*.25, ih*.3-walkOff);
+    const walkOff2=Math.sin(gameTime*8+(j.x+j.y)*.1)*ih*.05;
+    ctx.fillRect(drawX+iw*.2,  drawY+ih*.65, iw*.25, ih*.3+walkOff2);
+    ctx.fillRect(drawX+iw*.55, drawY+ih*.65, iw*.25, ih*.3-walkOff2);
 
-    // Brazos
-    ctx.fillStyle=`rgb(${sr},${sg},${sb})`;
+    ctx.fillStyle=`rgb(${sr2},${sg2},${sb2})`;
     ctx.fillRect(drawX+iw*.05, drawY+ih*.3, iw*.15, ih*.3);
-    ctx.fillRect(drawX+iw*.8, drawY+ih*.3, iw*.15, ih*.3);
+    ctx.fillRect(drawX+iw*.8,  drawY+ih*.3, iw*.15, ih*.3);
 
-    // Arma
-    const armaColor=ARMAS[j.arma||0]?.color||'#884400';
+    const armaColor = ARMAS[j.arma||0]?.color||'#884400';
     ctx.fillStyle=armaColor;
     ctx.fillRect(drawX+iw*.82, drawY+ih*.2, iw*.12, ih*.5);
 
-    // HP indicator (punto de color)
     if(j.hp<50) {
         ctx.fillStyle=j.hp<25?'#ff2222':'#ffaa00';
         ctx.fillRect(drawX+iw*.4, drawY-ih*.02, iw*.2, ih*.03);
@@ -825,11 +897,15 @@ function renderBalas() {
         const scx=(a/FOV+.5)*W;
         const sc=Math.floor(scx);
         if(sc<0||sc>=W||dist>=zBuffer[sc]) continue;
-        // Proyectil: solo 3x3 pixels
-        const sz=3;
-        const sy=H/2;
-        ctx.fillStyle=b.fromId===miId?'#ffcc00':'#ff4400';
+        // Altura correcta basada en distancia (igual que los sprites)
+        const sh=(TILE/dist)*600;
+        const sy=H/2; // balas vuelan a altura media
+        const sz=Math.max(3, Math.floor(8*sh/200));
+        ctx.fillStyle=b.fromId===miId?'#ffdd00':'#ff4400';
+        ctx.shadowColor=b.fromId===miId?'#ffdd00':'#ff4400';
+        ctx.shadowBlur=6;
         ctx.fillRect(scx-sz/2, sy-sz/2, sz, sz);
+        ctx.shadowBlur=0;
     }
 }
 function renderMinimap() {
