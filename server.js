@@ -126,12 +126,21 @@ function generarNPCs(mapa, cantidad, salaId) {
     for (let i = 0; i < cantidad; i++) {
         const spawn = mapa.spawns[(i + 1) % mapa.spawns.length];
         const id = `npc_${salaId}_${i}`;
+        // Spawn en centro exacto del tile para evitar colisiones
+        let spawnX = spawn.x * 64 + 32, spawnY = spawn.y * 64 + 32;
+        // Buscar tile libre si el spawn está ocupado
+        for (let tries = 0; tries < 50; tries++) {
+            const tx = Math.floor(spawnX/64), ty = Math.floor(spawnY/64);
+            if (ty>=0&&ty<mapa.alto&&tx>=0&&tx<mapa.ancho&&mapa.tiles[ty][tx]===0) break;
+            spawnX = (1 + Math.floor(Math.random()*(mapa.ancho-2))) * 64 + 32;
+            spawnY = (1 + Math.floor(Math.random()*(mapa.alto-2))) * 64 + 32;
+        }
         npcs[id] = {
             id, esNPC: true,
             nombre: nombres[i % nombres.length],
             skin: 'conquistador',
-            x: (spawn.x + (Math.random()-0.5)) * 64,
-            y: (spawn.y + (Math.random()-0.5)) * 64,
+            x: spawnX,
+            y: spawnY,
             angle: Math.random() * Math.PI * 2,
             hp: 100, maxHp: 100, vivo: true,
             arma: 0, kills: 0, muertes: 0, monedas: 0,
@@ -150,8 +159,13 @@ function generarNPCs(mapa, cantidad, salaId) {
 }
 
 function colisionNPC(mapa, x, y, radio) {
-    const r = radio || 20;
-    const checks = [[x+r,y+r],[x-r,y+r],[x+r,y-r],[x-r,y-r]];
+    const r = radio || 18;
+    // Primero verificar el tile central
+    const ctx2 = Math.floor(x/64), cty = Math.floor(y/64);
+    if (cty < 0 || cty >= mapa.alto || ctx2 < 0 || ctx2 >= mapa.ancho) return true;
+    if (mapa.tiles[cty][ctx2] !== 0) return true;
+    // Luego las esquinas con radio reducido
+    const checks = [[x+r,y],[x-r,y],[x,y+r],[x,y-r]];
     for (const [cx,cy] of checks) {
         const tx = Math.floor(cx/64), ty = Math.floor(cy/64);
         if (ty < 0 || ty >= mapa.alto || tx < 0 || tx >= mapa.ancho) return true;
@@ -608,13 +622,16 @@ io.on('connection', (socket) => {
         io.to(salaId).emit('bala_creada', bala);
 
         // Detección de hit — simular trayectoria de la bala paso a paso
-        const HIT_RADIO = 40;
+        const HIT_RADIO = 50;
         let balaX = data.x, balaY = data.y;
-        const bdx = data.dx, bdy = data.dy;
+        // Normalizar dirección y usar pasos más pequeños para mayor precisión
+        const bSpeed = Math.sqrt(data.dx*data.dx + data.dy*data.dy) || 1;
+        const bStepX = (data.dx / bSpeed) * 8;
+        const bStepY = (data.dy / bSpeed) * 8;
         let hitRegistrado = false;
 
-        for (let paso = 0; paso < 60 && !hitRegistrado; paso++) {
-            balaX += bdx; balaY += bdy;
+        for (let paso = 0; paso < 150 && !hitRegistrado; paso++) {
+            balaX += bStepX; balaY += bStepY;
             // Colision con pared
             const btx = Math.floor(balaX/64), bty = Math.floor(balaY/64);
             if (bty < 0 || bty >= sala.mapa.alto || btx < 0 || btx >= sala.mapa.ancho) break;
