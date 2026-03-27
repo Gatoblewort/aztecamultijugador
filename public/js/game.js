@@ -535,6 +535,7 @@ function render() {
 
     // ── Sprites (otros jugadores, balas, monedas, partículas) ──
     renderSprites();
+    renderBalas();
     renderArma();
     renderParticulas2D();
 }
@@ -783,9 +784,8 @@ function getSkinColors() {
     return m[sk]||m['guerrero_base'];
 }
 
-// ── PARTÍCULAS 2D ─────────────────────────────────────────────────────────
+// ── PARTÍCULAS 2D (balas y efectos) ──────────────────────────────────────
 function renderParticulas2D() {
-    // Solo renderizar partículas que están cerca del jugador (en espacio 2D de mundo → pantalla)
     for(const p of particulas) {
         const dx=p.x-yo.x, dy=p.y-yo.y;
         const dist=Math.sqrt(dx*dx+dy*dy);
@@ -795,9 +795,10 @@ function renderParticulas2D() {
         while(a<-Math.PI)a+=TWO_PI; while(a>Math.PI)a-=TWO_PI;
         if(Math.abs(a)>FOV/1.5) continue;
         const scx=(a/FOV+.5)*W;
-        const sh=(TILE/Math.max(1,dist))*600*.3;
+        // Partículas MUY pequeñas — máx 4px
+        const sh=Math.min(4,(TILE/Math.max(1,dist))*30);
         if(dist<zBuffer[Math.floor(scx)]||dist<1) {
-            ctx.globalAlpha=p.life;
+            ctx.globalAlpha=p.life*0.9;
             ctx.fillStyle=`rgb(${p.r},${p.g},${p.b})`;
             ctx.fillRect(scx-sh/2, H/2-sh/2, sh, sh);
             ctx.globalAlpha=1;
@@ -805,7 +806,27 @@ function renderParticulas2D() {
     }
 }
 
-// ── MINIMAP ───────────────────────────────────────────────────────────────
+// ── RENDER BALAS (proyectiles pequeños) ──────────────────────────────────
+function renderBalas() {
+    for(const id in balas) {
+        const b=balas[id];
+        const dx=b.x-yo.x, dy=b.y-yo.y;
+        const dist=Math.sqrt(dx*dx+dy*dy);
+        if(dist>400||dist<5) continue;
+        const angle=Math.atan2(dy,dx)-yo.angle;
+        let a=angle;
+        while(a<-Math.PI)a+=TWO_PI; while(a>Math.PI)a-=TWO_PI;
+        if(Math.abs(a)>FOV/1.6) continue;
+        const scx=(a/FOV+.5)*W;
+        const sc=Math.floor(scx);
+        if(sc<0||sc>=W||dist>=zBuffer[sc]) continue;
+        // Proyectil: solo 3x3 pixels
+        const sz=3;
+        const sy=H/2;
+        ctx.fillStyle=b.fromId===miId?'#ffcc00':'#ff4400';
+        ctx.fillRect(scx-sz/2, sy-sz/2, sz, sz);
+    }
+}
 function renderMinimap() {
     if(!mapa) return;
     const sz=120, ts=sz/mapa.ancho;

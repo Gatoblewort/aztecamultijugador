@@ -52,78 +52,71 @@ const NPCS_BASE          = 4;    // NPCs cuando juegas solo
 const MAPAS = ['templo_1', 'catacumba_2', 'templo_3'];
 
 function generarMapa(tipo) {
-    // Retorna una matriz de tiles compatible con el raycaster del cliente
     // 0=vacío, 1=piedra, 2=pirámide, 3=jade, 4=oro, 5=puerta, 6=oscuro, 7=lava
     if (tipo === 'templo_1') {
         const W = 24, H = 24;
         const m = Array.from({ length: H }, () => Array(W).fill(2));
-        // Pasillos horizontales
-        [3,7,11,15,19].forEach(r => { for(let x=1;x<W-1;x++) m[r][x]=0; });
-        // Pasillos verticales
-        [3,7,11,15,19].forEach(c => { for(let y=1;y<H-1;y++) m[y][c]=0; });
-        // Sala central
-        for(let y=9;y<15;y++) for(let x=9;x<15;x++) m[y][x]=0;
-        // Paredes doradas sala central
-        for(let x=9;x<15;x++) { m[9][x]=4; m[14][x]=4; }
-        for(let y=9;y<15;y++) { m[y][9]=4; m[y][14]=4; }
-        m[9][11]=0; m[9][12]=0; m[14][11]=0; m[14][12]=0;
-        m[11][9]=0; m[12][9]=0; m[11][14]=0; m[12][14]=0;
+        // Pasillos anchos (3 tiles de ancho)
+        [3,4,  8,9,  14,15,  19,20].forEach(r => { for(let x=1;x<W-1;x++) m[r][x]=0; });
+        [3,4,  8,9,  14,15,  19,20].forEach(c => { for(let y=1;y<H-1;y++) m[y][c]=0; });
+        // Sala central amplia
+        for(let y=9;y<16;y++) for(let x=9;x<16;x++) m[y][x]=0;
+        // Paredes doradas sala central con entradas amplias
+        for(let x=9;x<16;x++) { m[9][x]=4; m[15][x]=4; }
+        for(let y=9;y<16;y++) { m[y][9]=4; m[y][15]=4; }
+        // Entradas amplias (2 tiles)
+        m[9][11]=0; m[9][12]=0; m[9][13]=0;
+        m[15][11]=0; m[15][12]=0; m[15][13]=0;
+        m[11][9]=0; m[12][9]=0; m[13][9]=0;
+        m[11][15]=0; m[12][15]=0; m[13][15]=0;
         // Jade en esquinas
-        m[5][5]=3; m[5][18]=3; m[18][5]=3; m[18][18]=3;
-        // Puertas
-        m[3][11]=5; m[11][3]=5; m[15][11]=5;
-        // Variedad aleatoria
-        for(let i=0;i<20;i++){
-            const rx=1+Math.floor(Math.random()*(W-2));
-            const ry=1+Math.floor(Math.random()*(H-2));
-            if(m[ry][rx]===2) m[ry][rx]=1;
-        }
+        m[2][2]=3; m[2][21]=3; m[21][2]=3; m[21][21]=3;
+        // Solo pilares decorativos en intersecciones (no en pasillos)
+        [[6,6],[6,17],[17,6],[17,17]].forEach(([x,y]) => { m[y][x]=1; });
         return { tiles: m, ancho: W, alto: H,
-                 spawns: [{x:3.5,y:3.5},{x:20.5,y:3.5},{x:3.5,y:20.5},{x:20.5,y:20.5},
-                           {x:11.5,y:3.5},{x:3.5,y:11.5},{x:20.5,y:11.5},{x:11.5,y:20.5}] };
+                 spawns: [{x:2,y:2},{x:21,y:2},{x:2,y:21},{x:21,y:21},
+                           {x:11,y:2},{x:2,y:11},{x:21,y:11},{x:11,y:21}] };
     }
     if (tipo === 'catacumba_2') {
         const W = 36, H = 36;
         const m = Array.from({ length: H }, () => Array(W).fill(6));
-        [2,5,9,13,17,21,25,29,33].forEach(r => { for(let x=1;x<W-1;x++) m[r][x]=0; });
-        [2,5,9,13,17,21,25,29,33].forEach(c => { for(let y=1;y<H-1;y++) m[y][c]=0; });
-        [[3,3,6,6],[3,27,6,6],[27,3,6,6],[27,27,6,6]].forEach(([ox,oy,w,h])=>{
+        // Pasillos anchos
+        [2,3,7,8,13,14,19,20,25,26,31,32].forEach(r => { for(let x=1;x<W-1;x++) m[r][x]=0; });
+        [2,3,7,8,13,14,19,20,25,26,31,32].forEach(c => { for(let y=1;y<H-1;y++) m[y][c]=0; });
+        // Salas en esquinas
+        [[2,2,8,8],[2,26,8,8],[26,2,8,8],[26,26,8,8]].forEach(([ox,oy,w,h])=>{
             for(let y=oy;y<oy+h;y++) for(let x=ox;x<ox+w;x++) m[y][x]=0;
         });
-        for(let y=15;y<21;y++) for(let x=15;x<21;x++){
-            if(y===15||x===15||x===20) m[y][x]=7; else m[y][x]=0;
+        // Sala central con lava
+        for(let y=15;y<22;y++) for(let x=15;x<22;x++){
+            if(y===15||y===21||x===15||x===21) m[y][x]=7; else m[y][x]=0;
         }
+        // Entradas a sala central
+        m[15][18]=0; m[15][19]=0; m[21][18]=0; m[21][19]=0;
+        m[18][15]=0; m[19][15]=0; m[18][21]=0; m[19][21]=0;
         m[9][9]=3; m[9][26]=3; m[26][9]=3; m[26][26]=3;
         m[5][17]=5; m[17][5]=5; m[29][17]=5; m[17][29]=5;
-        for(let i=0;i<40;i++){
-            const rx=1+Math.floor(Math.random()*(W-2));
-            const ry=1+Math.floor(Math.random()*(H-2));
-            if(m[ry][rx]===6) m[ry][rx]= Math.random()<0.3?7:1;
-        }
         return { tiles: m, ancho: W, alto: H,
-                 spawns: [{x:4,y:4},{x:32,y:4},{x:4,y:32},{x:32,y:32},
-                           {x:18,y:4},{x:4,y:18},{x:32,y:18},{x:18,y:32}] };
+                 spawns: [{x:4,y:4},{x:31,y:4},{x:4,y:31},{x:31,y:31},
+                           {x:18,y:4},{x:4,y:18},{x:31,y:18},{x:18,y:31}] };
     }
-    // templo_3 por defecto
+    // templo_3
     const W = 32, H = 32;
     const m = Array.from({ length: H }, () => Array(W).fill(2));
-    [3,7,11,15,19,23,27].forEach(r => { for(let x=1;x<W-1;x++) m[r][x]=0; });
-    [3,7,11,15,19,23,27].forEach(c => { for(let y=1;y<H-1;y++) m[y][c]=0; });
-    for(let y=13;y<19;y++) for(let x=13;x<19;x++) m[y][x]=0;
-    for(let x=13;x<19;x++){m[13][x]=4;m[18][x]=4;}
-    for(let y=13;y<19;y++){m[y][13]=4;m[y][18]=4;}
-    m[13][15]=0;m[13][16]=0;m[18][15]=0;m[18][16]=0;
-    m[15][13]=0;m[16][13]=0;m[15][18]=0;m[16][18]=0;
-    [[3,3],[3,14],[3,25],[14,3],[25,3],[25,14],[25,25],[14,25]].forEach(([x,y])=>{m[y][x]=3;});
-    [[7,7],[7,21],[21,7],[21,21]].forEach(([x,y])=>{m[y][x]=7;});
-    for(let i=0;i<30;i++){
-        const rx=1+Math.floor(Math.random()*(W-2));
-        const ry=1+Math.floor(Math.random()*(H-2));
-        if(m[ry][rx]===2) m[ry][rx]=1;
-    }
+    [3,4,9,10,16,17,23,24,28,29].forEach(r => { for(let x=1;x<W-1;x++) m[r][x]=0; });
+    [3,4,9,10,16,17,23,24,28,29].forEach(c => { for(let y=1;y<H-1;y++) m[y][c]=0; });
+    for(let y=13;y<20;y++) for(let x=13;x<20;x++) m[y][x]=0;
+    for(let x=13;x<20;x++){m[13][x]=4;m[19][x]=4;}
+    for(let y=13;y<20;y++){m[y][13]=4;m[y][19]=4;}
+    m[13][15]=0;m[13][16]=0;m[13][17]=0;
+    m[19][15]=0;m[19][16]=0;m[19][17]=0;
+    m[15][13]=0;m[16][13]=0;m[17][13]=0;
+    m[15][19]=0;m[16][19]=0;m[17][19]=0;
+    [[3,3],[3,28],[28,3],[28,28]].forEach(([x,y])=>{m[y][x]=3;});
+    [[7,7],[7,24],[24,7],[24,24]].forEach(([x,y])=>{m[y][x]=7;});
     return { tiles: m, ancho: W, alto: H,
-             spawns: [{x:3.5,y:3.5},{x:28.5,y:3.5},{x:3.5,y:28.5},{x:28.5,y:28.5},
-                       {x:15.5,y:3.5},{x:3.5,y:15.5},{x:28.5,y:15.5},{x:15.5,y:28.5}] };
+             spawns: [{x:2,y:2},{x:29,y:2},{x:2,y:29},{x:29,y:29},
+                       {x:15,y:2},{x:2,y:15},{x:29,y:15},{x:15,y:29}] };
 }
 
 // ─── MATCHMAKING ─────────────────────────────────────────────────────────────
