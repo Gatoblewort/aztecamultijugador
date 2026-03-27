@@ -119,6 +119,35 @@ function generarMapa(tipo) {
                        {x:15,y:3},{x:3,y:15},{x:27,y:15},{x:15,y:27}] };
 }
 
+// ─── SPAWN SEGURO ────────────────────────────────────────────────────────────
+// Busca el tile libre más cercano al spawn deseado y devuelve coordenadas
+// en píxeles centradas en ese tile. Nunca devuelve una posición dentro de pared.
+function encontrarSpawnLibre(mapa, tileX, tileY) {
+    // Radio de búsqueda en espiral
+    for (let r = 0; r <= 5; r++) {
+        for (let dy = -r; dy <= r; dy++) {
+            for (let dx = -r; dx <= r; dx++) {
+                if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue; // solo borde
+                const tx = tileX + dx, ty = tileY + dy;
+                if (tx < 1 || ty < 1 || tx >= mapa.ancho - 1 || ty >= mapa.alto - 1) continue;
+                if (mapa.tiles[ty][tx] === 0) {
+                    // Centro exacto del tile = tile * 64 + 32
+                    return { x: tx * 64 + 32, y: ty * 64 + 32 };
+                }
+            }
+        }
+    }
+    // Fallback: buscar cualquier tile vacío en el mapa
+    for (let ty = 1; ty < mapa.alto - 1; ty++) {
+        for (let tx = 1; tx < mapa.ancho - 1; tx++) {
+            if (mapa.tiles[ty][tx] === 0) {
+                return { x: tx * 64 + 32, y: ty * 64 + 32 };
+            }
+        }
+    }
+    return { x: 64 + 32, y: 64 + 32 }; // último recurso
+}
+
 // ─── MATCHMAKING ─────────────────────────────────────────────────────────────
 
 // ── Constantes de IA (equivalentes al C) ──────────────────────────────────
@@ -241,7 +270,7 @@ function dispararNPC(sala, io, npc, id, aimAngle, spread = 0.12) {
                 setTimeout(() => {
                     if (!salas.has(sala.id)) return;
                     const spawn = sala.mapa.spawns[Math.floor(Math.random() * sala.mapa.spawns.length)];
-                    jug.x = spawn.x * 64; jug.y = spawn.y * 64;
+                    const sp = encontrarSpawnLibre(sala.mapa, spawn.x, spawn.y); jug.x = sp.x; jug.y = sp.y;
                     jug.hp = jug.maxHp; jug.vivo = true;
                     io.to(sala.id).emit('jugador_respawn', { id: sid, x: jug.x, y: jug.y, hp: jug.hp });
                 }, 5000);
@@ -561,11 +590,13 @@ function intentarCrearSala() {
 
     grupo.forEach((entry, i) => {
         const spawn = mapa.spawns[i % mapa.spawns.length];
+        // Spawn en el centro exacto del tile garantizado libre
+        const spawnPos = encontrarSpawnLibre(mapa, spawn.x, spawn.y);
         const jugadorEnSala = {
             ...entry.jugadorData,
             socketId: entry.socket.id,
-            x: (spawn.x + (Math.random()-0.5)*0.5) * 64,
-            y: (spawn.y + (Math.random()-0.5)*0.5) * 64,
+            x: spawnPos.x,
+            y: spawnPos.y,
             angle: Math.random() * Math.PI * 2,
             hp: 100,
             maxHp: 100,
@@ -721,7 +752,7 @@ io.on('connection', (socket) => {
             const jugadorEnSala = {
                 ...jugadorData,
                 socketId: socket.id,
-                x: spawn.x * 64, y: spawn.y * 64,
+                x: encontrarSpawnLibre(salaEnCurso.mapa, spawn.x, spawn.y).x, y: encontrarSpawnLibre(salaEnCurso.mapa, spawn.x, spawn.y).y,
                 angle: Math.random() * Math.PI * 2,
             };
             salaEnCurso.jugadores.set(socket.id, jugadorEnSala);
@@ -846,7 +877,7 @@ io.on('connection', (socket) => {
                         setTimeout(() => {
                             if (!salas.has(salaId)) return;
                             const spawn = sala.mapa.spawns[Math.floor(Math.random()*sala.mapa.spawns.length)];
-                            objetivo.x = spawn.x*64; objetivo.y = spawn.y*64;
+                            const sp2=encontrarSpawnLibre(sala.mapa,spawn.x,spawn.y); objetivo.x=sp2.x; objetivo.y=sp2.y;
                             objetivo.hp = objetivo.maxHp; objetivo.vivo = true;
                             io.to(salaId).emit('jugador_respawn', { id: sid, x: objetivo.x, y: objetivo.y, hp: objetivo.hp });
                         }, 5000);

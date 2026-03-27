@@ -9,7 +9,7 @@
 body{background:#000;overflow:hidden;font-family:'Segoe UI',sans-serif;touch-action:none;}
 #gameCanvas{display:block;width:100vw;height:100vh;image-rendering:pixelated;}
 
-/* ── HUD ── */
+/* ── HUD TOP ── */
 #hud{position:fixed;top:0;left:0;right:0;pointer-events:none;z-index:10;}
 #hudTop{
     display:flex;justify-content:space-between;align-items:flex-start;
@@ -23,6 +23,21 @@ body{background:#000;overflow:hidden;font-family:'Segoe UI',sans-serif;touch-act
 #hudTimer{font-size:22px;font-weight:900;color:#fff;text-align:center;}
 #hudTimer.urgente{color:#ff4444;animation:timer-pulse .5s infinite alternate;}
 @keyframes timer-pulse{from{opacity:1}to{opacity:.4}}
+
+/* ── BLOQUE IZQUIERDO: Bajas arriba, Monedas abajo ── */
+#hudLeft{display:flex;flex-direction:column;gap:6px;}
+#hudKillsBlock{background:#00000077;border-radius:10px;padding:8px 14px;
+    border:1px solid #ffffff15;backdrop-filter:blur(4px);}
+#hudMonedasBlock{background:#00000077;border-radius:10px;padding:6px 14px;
+    border:1px solid #ffffff15;backdrop-filter:blur(4px);}
+#hudMonedasBlock .hud-val{font-size:16px;}
+#hudMonedasBlock .hud-lbl{font-size:8px;}
+
+/* ── MINIMAP — esquina superior derecha, alineado con el HUD ── */
+#minimap{position:fixed;top:10px;right:14px;
+    width:130px;height:130px;border-radius:10px;
+    border:1px solid #ffffff33;overflow:hidden;opacity:.85;
+    box-shadow:0 0 10px #00000088;z-index:10;}
 
 /* ── BARRA DE VIDA ── */
 #hudBottom{position:fixed;bottom:0;left:0;right:0;
@@ -44,8 +59,8 @@ body{background:#000;overflow:hidden;font-family:'Segoe UI',sans-serif;touch-act
 #armaName{font-size:14px;font-weight:700;color:#a855f7;}
 #municion{font-size:12px;color:#8888aa;}
 
-/* ── KILLFEED ── */
-#killfeed{position:fixed;top:60px;right:14px;
+/* ── KILLFEED — empieza debajo del minimap ── */
+#killfeed{position:fixed;top:155px;right:14px;
     display:flex;flex-direction:column;gap:4px;pointer-events:none;z-index:11;}
 .kf-item{background:#00000088;border-radius:8px;padding:5px 10px;
     font-size:11px;color:#fff;border-left:3px solid #7c3aed;
@@ -61,12 +76,6 @@ body{background:#000;overflow:hidden;font-family:'Segoe UI',sans-serif;touch-act
 #chatInput{width:100%;margin-top:6px;padding:7px 10px;border-radius:8px;
     border:1px solid #ffffff22;background:#00000099;color:#fff;font-size:12px;
     outline:none;display:none;}
-
-/* ── MINIMAP ── */
-#minimap{position:fixed;bottom:80px;right:14px;
-    width:130px;height:130px;border-radius:10px;
-    border:1px solid #ffffff33;overflow:hidden;opacity:.85;
-    box-shadow:0 0 10px #00000088;}
 
 /* ── CROSSHAIR ── */
 #crosshair{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
@@ -126,20 +135,29 @@ body{background:#000;overflow:hidden;font-family:'Segoe UI',sans-serif;touch-act
 <!-- HUD -->
 <div id="hud">
     <div id="hudTop">
-        <div class="hud-block">
-            <div class="hud-val" id="hudKills">0</div>
-            <div class="hud-lbl">⚔️ Bajas</div>
+        <!-- Izquierda: Bajas arriba, Monedas abajo -->
+        <div id="hudLeft">
+            <div id="hudKillsBlock">
+                <div class="hud-val" id="hudKills">0</div>
+                <div class="hud-lbl">⚔️ Bajas</div>
+            </div>
+            <div id="hudMonedasBlock">
+                <div class="hud-val" id="hudMonedas">0</div>
+                <div class="hud-lbl">🪙 Monedas</div>
+            </div>
         </div>
+        <!-- Centro: Timer -->
         <div class="hud-block">
             <div id="hudTimer">05:00</div>
             <div class="hud-lbl" style="text-align:center">Tiempo</div>
         </div>
-        <div class="hud-block">
-            <div class="hud-val" id="hudMonedas">0</div>
-            <div class="hud-lbl">🪙 Monedas</div>
-        </div>
+        <!-- Derecha: espacio reservado para el minimap (posicionado por CSS fixed) -->
+        <div style="width:144px"></div>
     </div>
 </div>
+
+<!-- Minimap fijo en esquina superior derecha -->
+<canvas id="minimap"></canvas>
 
 <!-- HP + Arma -->
 <div id="hudBottom">
@@ -166,9 +184,6 @@ body{background:#000;overflow:hidden;font-family:'Segoe UI',sans-serif;touch-act
     <input id="chatInput" placeholder="T para chatear..." maxlength="80"
         onkeydown="chatKeydown(event)">
 </div>
-
-<!-- Minimap -->
-<canvas id="minimap"></canvas>
 
 <!-- Controles móvil -->
 <div id="joystickWrap">
