@@ -63,6 +63,11 @@ window.addEventListener('load', () => {
     yo = jugadores[miId];
     monedas = {};
     if (datos.monedas) Object.entries(datos.monedas).forEach(([k,v]) => monedas[k]=v);
+    // Cargar NPCs que vienen en el payload inicial (fix: antes se perdían por timing de socket)
+    if (datos.npcs) {
+        for (const id in datos.npcs) jugadores[id] = { ...datos.npcs[id] };
+        console.log(`🤖 ${Object.keys(datos.npcs).length} NPCs cargados desde partida_iniciada`);
+    }
     tiempoRestante = datos.tiempoTotal || 300;
 
     conectarSocket(token, datos.salaId);

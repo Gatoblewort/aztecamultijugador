@@ -258,6 +258,13 @@ function intentarCrearSala() {
         npcInterval: null
     };
 
+    // Generar NPCs ANTES de emitir partida_iniciada para incluirlos en el payload
+    const numNPCs = Math.max(0, NPCS_BASE - (grupo.length - 1));
+    if (numNPCs > 0) {
+        sala.npcs = generarNPCs(mapa, numNPCs, salaId);
+        console.log(`🤖 ${numNPCs} NPCs generados para sala ${salaId}`);
+    }
+
     grupo.forEach((entry, i) => {
         const spawn = mapa.spawns[i % mapa.spawns.length];
         const jugadorEnSala = {
@@ -284,22 +291,16 @@ function intentarCrearSala() {
             tipoMapa,
             jugadores: Object.fromEntries(sala.jugadores),
             tuId: entry.socket.id,
-            tiempoTotal: TIEMPO_PARTIDA
+            tiempoTotal: TIEMPO_PARTIDA,
+            npcs: sala.npcs || {}
         });
     });
 
     salas.set(salaId, sala);
     console.log(`🏛️  Sala ${salaId} creada con ${grupo.length} jugadores — mapa: ${tipoMapa}`);
 
-    // Generar NPCs si hay pocos jugadores humanos
-    const numNPCs = Math.max(0, NPCS_BASE - (grupo.length - 1));
+    // Iniciar loop de IA si hay NPCs
     if (numNPCs > 0) {
-        sala.npcs = generarNPCs(mapa, numNPCs, salaId);
-        // Notificar a todos los jugadores de los NPCs
-        const npcData = {};
-        for (const id in sala.npcs) npcData[id] = sala.npcs[id];
-        io.to(salaId).emit('npcs_spawned', npcData);
-        console.log(`🤖 ${numNPCs} NPCs generados para sala ${salaId}`);
         // Loop de IA de NPCs cada 100ms
         sala.npcInterval = setInterval(() => {
             if (!salas.has(salaId)) { clearInterval(sala.npcInterval); return; }
