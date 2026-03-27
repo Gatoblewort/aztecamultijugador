@@ -310,7 +310,15 @@ function conectarSocket() {
     });
 
     socket.on('en_cola', ({ posicion }) => {
-        setText('colaTexto', `Posición ${posicion} en la fila...`);
+        setText('colaTexto', `Buscando guerreros... entrando en 30s`);
+        // Countdown visual
+        let seg = 30;
+        if (window._colaTimer) clearInterval(window._colaTimer);
+        window._colaTimer = setInterval(() => {
+            seg--;
+            if (seg <= 0) { clearInterval(window._colaTimer); return; }
+            if (buscando) setText('colaTexto', `Buscando guerreros... entrando en ${seg}s`);
+        }, 1000);
     });
 
     socket.on('partida_iniciada', (datos) => {

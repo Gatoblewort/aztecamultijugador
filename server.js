@@ -417,17 +417,60 @@ io.on('connection', (socket) => {
             hp: 100, maxHp: 100, vivo: true,
             arma: 'macuahuitl'
         };
+
+        // Buscar sala en curso con espacio
+        let salaEnCurso = null;
+        for (const [sid, sala] of salas) {
+            if (sala.estado === 'jugando' && sala.jugadores.size < JUGADORES_POR_SALA) {
+                salaEnCurso = sala;
+                break;
+            }
+        }
+
+        if (salaEnCurso) {
+            // Unirse a sala en curso
+            const spawn = salaEnCurso.mapa.spawns[Math.floor(Math.random() * salaEnCurso.mapa.spawns.length)];
+            const jugadorEnSala = {
+                ...jugadorData,
+                socketId: socket.id,
+                x: spawn.x * 64, y: spawn.y * 64,
+                angle: Math.random() * Math.PI * 2,
+            };
+            salaEnCurso.jugadores.set(socket.id, jugadorEnSala);
+            socket.join(salaEnCurso.id);
+            socket.data.salaId = salaEnCurso.id;
+            socket.emit('partida_iniciada', {
+                salaId: salaEnCurso.id,
+                mapa: { tiles: salaEnCurso.mapa.tiles, ancho: salaEnCurso.mapa.ancho, alto: salaEnCurso.mapa.alto },
+                tipoMapa: salaEnCurso.tipoMapa,
+                jugadores: Object.fromEntries(salaEnCurso.jugadores),
+                tuId: socket.id,
+                tiempoTotal: TIEMPO_PARTIDA
+            });
+            // Notificar NPCs al nuevo jugador
+            if (salaEnCurso.npcs && Object.keys(salaEnCurso.npcs).length > 0) {
+                socket.emit('npcs_spawned', salaEnCurso.npcs);
+            }
+            // Avisar a los demás del nuevo jugador
+            socket.to(salaEnCurso.id).emit('jugador_unido', { id: socket.id, ...jugadorEnSala });
+            showToast && showToast(`${j.nombre} se unió a la batalla`);
+            console.log(`⚔️ ${j.nombre} se unió a sala en curso ${salaEnCurso.id}`);
+            return;
+        }
+
+        // No hay sala disponible — ir a cola
         colaEspera.push({ socket, jugadorData });
         socket.emit('en_cola', { posicion: colaEspera.length });
         io.emit('cola_actualizada', { enCola: colaEspera.length });
         console.log(`⏳ Cola: ${colaEspera.length} jugadores`);
-        // Si hay 2+ jugadores arranca de inmediato, si hay 1 espera 3s
-        if (colaEspera.length >= 2) {
+
+        // 30 segundos de espera, luego arranca solo o con quien haya
+        if (colaEspera.length >= JUGADORES_POR_SALA) {
             intentarCrearSala();
         } else {
             setTimeout(() => {
                 if (colaEspera.length >= 1) intentarCrearSala();
-            }, 3000);
+            }, 30000);
         }
     });
 

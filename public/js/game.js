@@ -267,6 +267,10 @@ function conectarSocket(token, salaId) {
     });
 
     socket.on('jugador_salio', ({ id }) => { delete jugadores[id]; });
+    socket.on('jugador_unido', (jug) => {
+        jugadores[jug.id] = jug;
+        addKillfeed(`⚔️ ${jug.nombre} se unió a la batalla`);
+    });
 
     socket.on('tick_timer', ({ tiempoRestante: t }) => {
         tiempoRestante = t;
