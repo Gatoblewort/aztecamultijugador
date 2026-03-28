@@ -257,10 +257,15 @@ function conectarSocket(token, salaId) {
     });
 
     socket.on('jugador_murio', ({id,matadoPor,kills,muertes}) => {
-        // Marcar como muerto — NO eliminar del objeto, el render lo salta con !j.vivo
+        // Marcar como muerto
         if (jugadores[id]) jugadores[id].vivo = false;
 
         const esNPCmuerto   = id && (id.startsWith('e_') || id.startsWith('npc_'));
+
+        // Si es NPC, eliminarlo del objeto después de 800ms (pequeño delay visual)
+        if (esNPCmuerto) {
+            setTimeout(() => { delete jugadores[id]; delete interpBuffers[id]; }, 800);
+        }
         const nombreVictima = jugadores[id]?.nombre || (esNPCmuerto ? 'Conquistador' : id);
         const nombreKiller  = jugadores[matadoPor]?.nombre || (matadoPor === 'boss' ? 'Hernán Cortés' : matadoPor);
 
