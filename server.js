@@ -1,3 +1,6 @@
+// ─── ENGINE — lógica portada del aztecawarior.c ─────────────────────────────
+const ENGINE = require('./public/js/engine.js');
+
 require('dotenv').config();
 const express    = require('express');
 const http       = require('http');
@@ -560,86 +563,154 @@ function actualizarNPCs(sala, io) {
 
 
 function intentarCrearSala() {
-    if (colaEspera.length < 1) return; // ¡1 jugador es suficiente!
+    if (colaEspera.length < 1) return;
 
-    const grupo = colaEspera.splice(0, Math.min(JUGADORES_POR_SALA, colaEspera.length));
-    const salaId = 'sala_' + Date.now();
-    const tipoMapa = MAPAS[Math.floor(Math.random() * MAPAS.length)];
-    const mapa = generarMapa(tipoMapa);
+    const grupo   = colaEspera.splice(0, Math.min(JUGADORES_POR_SALA, colaEspera.length));
+    const salaId  = 'sala_' + Date.now();
 
+    // ── Crear estado de sala via ENGINE ──────────────────────────────────
+    const engineEstado = ENGINE.crearEstadoSala();
+
+    // Registrar jugadores en el engine
+    grupo.forEach(entry => {
+        const jData  = entry.jugadorData;
+        const player = ENGINE.crearJugador(entry.socket.id, jData.nombre, jData.skin || 'guerrero_base', jData.nivel || 1);
+        player.dbId  = jData.dbId;
+        engineEstado.players.set(entry.socket.id, player);
+    });
+
+    // Cargar nivel 1 (posiciona jugadores en spawns seguros)
+    ENGINE.cargarNivel(engineEstado, 1);
+
+    // ── Callbacks del engine → socket broadcasts ──────────────────────
+    engineEstado.onBala = (bala) => {
+        io.to(salaId).emit('bala_creada', bala);
+    };
+    engineEstado.onDanioJugador = (id, hp, fromId, danio) => {
+        const p = engineEstado.players.get(id);
+        if (p && hp <= 0 && p.vivo) {
+            p.vivo = false; p.muertes++;
+            io.to(salaId).emit('jugador_murio', { id, matadoPor: fromId,
+                kills: engineEstado.players.get(fromId)?.kills || 0, muertes: p.muertes });
+            setTimeout(() => {
+                if (!salas.has(salaId)) return;
+                const spawn = engineEstado.mapa.spawns[Math.floor(Math.random()*engineEstado.mapa.spawns.length)];
+                const pos   = ENGINE.spawnSeguro(engineEstado.mapa, spawn.x, spawn.y);
+                p.x=pos.x; p.y=pos.y; p.hp=p.maxHp; p.vivo=true;
+                io.to(salaId).emit('jugador_respawn', { id, x:p.x, y:p.y, hp:p.hp });
+            }, 5000);
+        } else {
+            io.to(salaId).emit('jugador_recibio_danio', { id, hp, fromId, danio });
+        }
+    };
+    engineEstado.onMuerteJugador = (id, matadoPor, kills, muertes) => {
+        io.to(salaId).emit('jugador_murio', { id, matadoPor, kills, muertes });
+    };
+    engineEstado.onMonedaRecogida = (monedaId, jugadorId, total) => {
+        io.to(salaId).emit('moneda_recogida', { monedaId, porId: jugadorId, monedas: total });
+    };
+    engineEstado.onSpawnPickup = (tipo, data) => {
+        io.to(salaId).emit('pickup_spawned', { tipo, data });
+    };
+    engineEstado.onBossUpdate = (bossData) => {
+        io.to(salaId).emit('boss_update', bossData);
+    };
+    engineEstado.onBossMuerto = () => {
+        io.to(salaId).emit('boss_muerto');
+    };
+    engineEstado.onNivelTransicion = (nivelActual, nivelSiguiente) => {
+        if (nivelSiguiente > 3) {
+            // Victoria total
+            terminarPartida(salaId, 'victoria');
+            return;
+        }
+        io.to(salaId).emit('nivel_transicion', { nivelActual, nivelSiguiente });
+        // Después de 4 segundos, cargar el nivel siguiente
+        setTimeout(() => {
+            if (!salas.has(salaId)) return;
+            ENGINE.cargarNivel(engineEstado, nivelSiguiente);
+            // Enviar nuevo estado a todos
+            const jugadoresObj = {};
+            for (const [sid, p] of engineEstado.players) jugadoresObj[sid] = p;
+            const npcsObj = {};
+            for (const e of engineEstado.enemies) npcsObj[e.id] = { ...e, esNPC:true, skin:'conquistador', nombre:e.id };
+            const monedasObj = {};
+            engineEstado.coins.forEach(c => monedasObj[c.id]=c);
+            io.to(salaId).emit('nivel_cargado', {
+                nivel:      nivelSiguiente,
+                mapa:       { tiles: engineEstado.mapa.tiles, ancho: engineEstado.mapa.ancho, alto: engineEstado.mapa.alto },
+                jugadores:  jugadoresObj,
+                npcs:       npcsObj,
+                monedas:    monedasObj,
+            });
+            console.log(`🏛️ Sala ${salaId} → Nivel ${nivelSiguiente}`);
+        }, 4000);
+    };
+    engineEstado.onVictoria = (resultados) => terminarPartida(salaId, 'victoria');
+
+    // ── Construir sala compatible con el resto del servidor ──────────────
     const sala = {
-        id: salaId,
-        mapa,
-        tipoMapa,
-        estado: 'jugando',
-        tiempoInicio: Date.now(),
-        jugadores: new Map(),
-        balas: new Map(),
-        monedas: generarMonedas(mapa),
-        npcs: {},
+        id:          salaId,
+        engine:      engineEstado,
+        mapa:        engineEstado.mapa,
+        tipoMapa:    'templo_1',
+        estado:      'jugando',
+        jugadores:   engineEstado.players,   // alias para compatibilidad
+        npcs:        {},
         timerInterval: null,
-        npcInterval: null
+        engineInterval: null,
     };
 
-    // Generar NPCs ANTES de emitir partida_iniciada para incluirlos en el payload
-    const numNPCs = Math.max(0, NPCS_BASE - (grupo.length - 1));
-    if (numNPCs > 0) {
-        sala.npcs = generarNPCs(mapa, numNPCs, salaId);
-        console.log(`🤖 ${numNPCs} NPCs generados para sala ${salaId}`);
-    }
-
-    grupo.forEach((entry, i) => {
-        const spawn = mapa.spawns[i % mapa.spawns.length];
-        // Spawn en el centro exacto del tile garantizado libre
-        const spawnPos = encontrarSpawnLibre(mapa, spawn.x, spawn.y);
-        const jugadorEnSala = {
-            ...entry.jugadorData,
-            socketId: entry.socket.id,
-            x: spawnPos.x,
-            y: spawnPos.y,
-            angle: Math.random() * Math.PI * 2,
-            hp: 100,
-            maxHp: 100,
-            kills: 0,
-            muertes: 0,
-            monedas: 0,
-            arma: 'macuahuitl',
-            vivo: true,
-            respawnTimer: 0
-        };
-        sala.jugadores.set(entry.socket.id, jugadorEnSala);
+    // Emitir partida_iniciada a cada jugador
+    grupo.forEach(entry => {
+        const player = engineEstado.players.get(entry.socket.id);
         entry.socket.join(salaId);
         entry.socket.data.salaId = salaId;
+
+        const jugadoresObj = {};
+        for (const [sid, p] of engineEstado.players) jugadoresObj[sid] = { ...p };
+        const npcsObj = {};
+        for (const e of engineEstado.enemies)
+            npcsObj[e.id] = { ...e, esNPC:true, skin:'conquistador', nombre:e.id };
+        const monedasObj = {};
+        engineEstado.coins.forEach(c => monedasObj[c.id]=c);
+
         entry.socket.emit('partida_iniciada', {
             salaId,
-            mapa: { tiles: mapa.tiles, ancho: mapa.ancho, alto: mapa.alto },
-            tipoMapa,
-            jugadores: Object.fromEntries(sala.jugadores),
-            tuId: entry.socket.id,
-            tiempoTotal: TIEMPO_PARTIDA,
-            npcs: sala.npcs || {}
+            mapa:      { tiles: engineEstado.mapa.tiles, ancho: engineEstado.mapa.ancho, alto: engineEstado.mapa.alto },
+            tipoMapa:  'templo_1',
+            jugadores: jugadoresObj,
+            tuId:      entry.socket.id,
+            tiempoTotal: 0, // sin límite
+            nivel:     1,
+            npcs:      npcsObj,
+            monedas:   monedasObj,
         });
     });
 
     salas.set(salaId, sala);
-    console.log(`🏛️  Sala ${salaId} creada con ${grupo.length} jugadores — mapa: ${tipoMapa}`);
+    console.log(`🏛️  Sala ${salaId} — ${grupo.length} jugadores, nivel 1`);
 
-    // Iniciar loop de IA si hay NPCs
-    if (numNPCs > 0) {
-        // Loop de IA de NPCs cada 100ms
-        sala.npcInterval = setInterval(() => {
-            if (!salas.has(salaId)) { clearInterval(sala.npcInterval); return; }
-            actualizarNPCs(sala, io);
-        }, 100);
-    }
+    // ── Loop del ENGINE cada 100ms ────────────────────────────────────────
+    sala.engineInterval = setInterval(() => {
+        if (!salas.has(salaId)) { clearInterval(sala.engineInterval); return; }
+        const DT = 0.1;
+        ENGINE.tick(engineEstado, DT);
 
-    // Timer de la partida
-    let tiempoRestante = TIEMPO_PARTIDA;
-    sala.timerInterval = setInterval(() => {
-        tiempoRestante--;
-        io.to(salaId).emit('tick_timer', { tiempoRestante });
-        if (tiempoRestante <= 0) terminarPartida(salaId, 'tiempo');
-    }, 1000);
+        // Broadcast posiciones de enemigos (NPCs del engine)
+        for (const e of engineEstado.enemies) {
+            if (!e.active) continue;
+            io.to(salaId).emit('jugador_movio', {
+                id: e.id, x: e.x, y: e.y, angle: e.angle, arma: 0, estado: e.estado
+            });
+        }
+
+        // Tick timer (cronómetro ascendente)
+        io.to(salaId).emit('tick_timer', {
+            playTimer: engineEstado.playTimer,
+            nivel:     engineEstado.level,
+        });
+    }, 100);
 }
 
 function generarMonedas(mapa) {
@@ -665,12 +736,16 @@ async function terminarPartida(salaId, razon) {
     if (!sala || sala.estado === 'terminada') return;
     sala.estado = 'terminada';
     clearInterval(sala.timerInterval);
-    if (sala.npcInterval) clearInterval(sala.npcInterval);
+    if (sala.npcInterval)    clearInterval(sala.npcInterval);
+    if (sala.engineInterval) clearInterval(sala.engineInterval);
 
-    // Calcular ranking de la sala
-    const resultados = Array.from(sala.jugadores.values())
+    // Calcular ranking usando engine si está disponible
+    const jugadoresFuente = sala.engine
+        ? [...sala.engine.players.values()]
+        : Array.from(sala.jugadores.values());
+    const resultados = jugadoresFuente
         .sort((a,b) => b.kills - a.kills || a.muertes - b.muertes)
-        .map((j,i) => ({ ...j, posicion: i+1 }));
+        .map((j,i) => ({ ...j, posicion: i+1, tiempo: sala.engine?.playTimer || 0 }));
 
     io.to(salaId).emit('partida_terminada', { razon, resultados });
 
@@ -688,7 +763,7 @@ async function terminarPartida(salaId, razon) {
             await pool.query(
                 `INSERT INTO partida_jugadores (partida_id,jugador_id,kills,muertes,monedas_ganadas,experiencia_ganada,posicion_final)
                  VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-                [partidaId, j.dbId, j.kills, j.muertes, j.monedas, xpGanada, j.posicion]
+                [partidaId, j.dbId, j.kills, j.muertes, j.gold||j.monedas||0, xpGanada, j.posicion]
             );
             await pool.query(
                 `UPDATE jugadores SET
@@ -700,7 +775,7 @@ async function terminarPartida(salaId, razon) {
                     partidas_ganadas = partidas_ganadas + $5,
                     nivel = GREATEST(nivel, FLOOR(SQRT((experiencia+$4)/100))::int + 1)
                  WHERE id = $6`,
-                [j.kills, j.muertes, j.monedas, xpGanada, j.posicion===1?1:0, j.dbId]
+                [j.kills, j.muertes, j.gold||j.monedas||0, xpGanada, j.posicion===1?1:0, j.dbId]
             );
         }
     } catch(e) { console.error('Error guardando stats:', e.message); }
@@ -808,128 +883,79 @@ io.on('connection', (socket) => {
         jugador.x     = data.x;
         jugador.y     = data.y;
         jugador.angle = data.angle;
-
+        // Sincronizar con engine si existe
+        if (sala.engine) {
+            const ep = sala.engine.players.get(socket.id);
+            if (ep) { ep.x=data.x; ep.y=data.y; ep.angle=data.angle; }
+        }
         // Broadcast a los demás en la sala
         socket.to(salaId).emit('jugador_movio', {
             id: socket.id,
             x: data.x, y: data.y, angle: data.angle,
-            arma: jugador.arma
+            arma: jugador.arma || 0,
+            skin: jugador.skin
         });
     });
 
     // ── Disparo ──
     socket.on('disparar', (data) => {
         const salaId = socket.data.salaId;
-        const sala = salas.get(salaId);
-        if (!sala) return;
-        const tirador = sala.jugadores.get(socket.id);
-        if (!tirador || !tirador.vivo) return;
-
-        const balaId = `b_${socket.id}_${Date.now()}`;
-        const bala = {
-            id: balaId,
-            x: data.x, y: data.y,
-            dx: data.dx, dy: data.dy,
-            danio: data.danio || 15,
-            fromId: socket.id,
-            vida: 2.5
-        };
-        sala.balas.set(balaId, bala);
-
-        // Broadcast bala a todos en la sala
-        io.to(salaId).emit('bala_creada', bala);
-
-        // Detección de hit — simular trayectoria paso a paso con radio generoso
-        // Radio ampliado a 64px para compensar latencia de red
-        const HIT_RADIO = 64;
-        let balaX = data.x, balaY = data.y;
-        const bSpeed = Math.sqrt(data.dx*data.dx + data.dy*data.dy) || 1;
-        const bStepX = (data.dx / bSpeed) * 6;   // pasos más pequeños = más precisión
-        const bStepY = (data.dy / bSpeed) * 6;
-        let hitRegistrado = false;
-
-        for (let paso = 0; paso < 200 && !hitRegistrado; paso++) {
-            balaX += bStepX; balaY += bStepY;
-            const btx = Math.floor(balaX/64), bty = Math.floor(balaY/64);
-            if (bty < 0 || bty >= sala.mapa.alto || btx < 0 || btx >= sala.mapa.ancho) break;
-            if (sala.mapa.tiles[bty][btx] !== 0) break;
-
-            // Chequear jugadores humanos
-            for (const [sid, objetivo] of sala.jugadores) {
-                if (sid === socket.id || !objetivo.vivo) continue;
-                const dx = objetivo.x - balaX, dy = objetivo.y - balaY;
-                if (Math.sqrt(dx*dx + dy*dy) < HIT_RADIO) {
-                    objetivo.hp -= bala.danio;
-                    sala.balas.delete(balaId);
-                    hitRegistrado = true;
-                    io.to(salaId).emit('jugador_recibio_danio', {
-                        id: sid, hp: objetivo.hp,
-                        fromId: socket.id, danio: bala.danio
-                    });
-                    if (objetivo.hp <= 0) {
-                        objetivo.vivo = false; objetivo.muertes++;
-                        tirador.kills++; tirador.monedas += 50;
-                        io.to(salaId).emit('jugador_murio', {
-                            id: sid, matadoPor: socket.id,
-                            kills: tirador.kills, muertes: objetivo.muertes
-                        });
-                        setTimeout(() => {
-                            if (!salas.has(salaId)) return;
-                            const spawn = sala.mapa.spawns[Math.floor(Math.random()*sala.mapa.spawns.length)];
-                            const sp2=encontrarSpawnLibre(sala.mapa,spawn.x,spawn.y); objetivo.x=sp2.x; objetivo.y=sp2.y;
-                            objetivo.hp = objetivo.maxHp; objetivo.vivo = true;
-                            io.to(salaId).emit('jugador_respawn', { id: sid, x: objetivo.x, y: objetivo.y, hp: objetivo.hp });
-                        }, 5000);
-                        const vivos = Array.from(sala.jugadores.values()).filter(j2 => j2.vivo).length;
-                        if (vivos <= 1) terminarPartida(salaId, 'eliminacion');
-                    }
-                    break;
-                }
-            }
-            if (hitRegistrado) break;
-
-            // Chequear NPCs
-            for (const nid in sala.npcs) {
-                const npc = sala.npcs[nid];
-                if (!npc.vivo) continue;
-                const dx = npc.x - balaX, dy = npc.y - balaY;
-                if (Math.sqrt(dx*dx + dy*dy) < HIT_RADIO) {
-                    npc.hp -= bala.danio;
-                    sala.balas.delete(balaId);
-                    hitRegistrado = true;
-                    io.to(salaId).emit('jugador_recibio_danio', {
-                        id: nid, hp: npc.hp,
-                        fromId: socket.id, danio: bala.danio
-                    });
-                    if (npc.hp <= 0) {
-                        npc.vivo = false;
-                        tirador.kills++; tirador.monedas += 50;
-                        io.to(salaId).emit('jugador_murio', {
-                            id: nid, matadoPor: socket.id,
-                            kills: tirador.kills, muertes: 0
-                        });
-                    }
-                    break;
-                }
-            }
-        }
-
+        const sala   = salas.get(salaId);
+        if (!sala || !sala.engine) return;
+        // Delegar al ENGINE — maneja hits, daño, drops, todo
+        const player = sala.engine.players.get(socket.id);
+        if (!player) return;
+        // Sincronizar posición reportada por el cliente
+        player.x = data.x; player.y = data.y;
+        ENGINE.jugadorDispara(sala.engine, socket.id, data.angle ?? Math.atan2(data.dy, data.dx));
     });
 
     // ── Recoger moneda ──
     socket.on('recoger_moneda', (monedaId) => {
         const salaId = socket.data.salaId;
-        const sala = salas.get(salaId);
-        if (!sala) return;
-        const moneda = sala.monedas.get(monedaId);
-        if (!moneda) return;
-        const jugador = sala.jugadores.get(socket.id);
-        if (!jugador) return;
-        jugador.monedas += moneda.valor;
-        sala.monedas.delete(monedaId);
-        io.to(salaId).emit('moneda_recogida', {
-            monedaId, porId: socket.id, monedas: jugador.monedas
-        });
+        const sala   = salas.get(salaId);
+        if (!sala?.engine) return;
+        const eng = sala.engine;
+        const idx = eng.coins.findIndex(c => c.id === monedaId);
+        if (idx === -1) return;
+        const moneda  = eng.coins[idx];
+        const player  = eng.players.get(socket.id);
+        if (!player) return;
+        player.gold  += moneda.valor;
+        eng.coins.splice(idx, 1);
+        io.to(salaId).emit('moneda_recogida', { monedaId, porId: socket.id, monedas: player.gold });
+    });
+
+    // ── Recoger corazón ──
+    socket.on('recoger_corazon', (id) => {
+        const salaId = socket.data.salaId;
+        const sala   = salas.get(salaId);
+        if (!sala?.engine) return;
+        const eng = sala.engine;
+        const idx = eng.hearts.findIndex(h => h.id === id);
+        if (idx === -1) return;
+        const heart  = eng.hearts[idx];
+        const player = eng.players.get(socket.id);
+        if (!player) return;
+        player.hp = Math.min(player.maxHp, player.hp + heart.heal);
+        eng.hearts.splice(idx, 1);
+        io.to(salaId).emit('corazon_recogido', { id, porId: socket.id, hp: player.hp });
+    });
+
+    // ── Recoger munición ──
+    socket.on('recoger_ammo', (id) => {
+        const salaId = socket.data.salaId;
+        const sala   = salas.get(salaId);
+        if (!sala?.engine) return;
+        const eng = sala.engine;
+        const idx = eng.ammoDrops.findIndex(a => a.id === id);
+        if (idx === -1) return;
+        const drop   = eng.ammoDrops[idx];
+        const player = eng.players.get(socket.id);
+        if (!player) return;
+        player.ammo = Math.min(999, player.ammo + drop.amount);
+        eng.ammoDrops.splice(idx, 1);
+        io.to(salaId).emit('ammo_recogido', { id, porId: socket.id, ammo: player.ammo });
     });
 
     // ── Chat en sala ──
