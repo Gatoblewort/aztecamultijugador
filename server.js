@@ -1,3 +1,6 @@
+// ─── ENGINE — lógica portada del aztecawarior.c ─────────────────────────────
+const ENGINE = require('./public/js/engine.js');
+
 require('dotenv').config();
 const express    = require('express');
 const http       = require('http');
@@ -74,8 +77,8 @@ function generarMapa(tipo) {
         // Solo pilares decorativos en intersecciones (no en pasillos)
         [[6,6],[6,17],[17,6],[17,17]].forEach(([x,y]) => { m[y][x]=1; });
         return { tiles: m, ancho: W, alto: H,
-                 spawns: [{x:2,y:2},{x:21,y:2},{x:2,y:21},{x:21,y:21},
-                           {x:11,y:2},{x:2,y:11},{x:21,y:11},{x:11,y:21}] };
+                 spawns: [{x:4,y:3},{x:19,y:3},{x:4,y:19},{x:19,y:19},
+                           {x:11,y:4},{x:4,y:11},{x:19,y:11},{x:11,y:19}] };
     }
     if (tipo === 'catacumba_2') {
         const W = 36, H = 36;
@@ -97,8 +100,8 @@ function generarMapa(tipo) {
         m[9][9]=3; m[9][26]=3; m[26][9]=3; m[26][26]=3;
         m[5][17]=5; m[17][5]=5; m[29][17]=5; m[17][29]=5;
         return { tiles: m, ancho: W, alto: H,
-                 spawns: [{x:4,y:4},{x:31,y:4},{x:4,y:31},{x:31,y:31},
-                           {x:18,y:4},{x:4,y:18},{x:31,y:18},{x:18,y:31}] };
+                 spawns: [{x:4,y:4},{x:30,y:4},{x:4,y:30},{x:30,y:30},
+                           {x:18,y:3},{x:3,y:18},{x:30,y:18},{x:18,y:30}] };
     }
     // templo_3
     const W = 32, H = 32;
@@ -115,205 +118,599 @@ function generarMapa(tipo) {
     [[3,3],[3,28],[28,3],[28,28]].forEach(([x,y])=>{m[y][x]=3;});
     [[7,7],[7,24],[24,7],[24,24]].forEach(([x,y])=>{m[y][x]=7;});
     return { tiles: m, ancho: W, alto: H,
-             spawns: [{x:2,y:2},{x:29,y:2},{x:2,y:29},{x:29,y:29},
-                       {x:15,y:2},{x:2,y:15},{x:29,y:15},{x:15,y:29}] };
+             spawns: [{x:4,y:3},{x:26,y:3},{x:4,y:26},{x:26,y:26},
+                       {x:15,y:3},{x:3,y:15},{x:27,y:15},{x:15,y:27}] };
+}
+
+// ─── SPAWN SEGURO ────────────────────────────────────────────────────────────
+// Busca el tile libre más cercano al spawn deseado y devuelve coordenadas
+// en píxeles centradas en ese tile. Nunca devuelve una posición dentro de pared.
+function encontrarSpawnLibre(mapa, tileX, tileY) {
+    // Radio de búsqueda en espiral
+    for (let r = 0; r <= 5; r++) {
+        for (let dy = -r; dy <= r; dy++) {
+            for (let dx = -r; dx <= r; dx++) {
+                if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue; // solo borde
+                const tx = tileX + dx, ty = tileY + dy;
+                if (tx < 1 || ty < 1 || tx >= mapa.ancho - 1 || ty >= mapa.alto - 1) continue;
+                if (mapa.tiles[ty][tx] === 0) {
+                    // Centro exacto del tile = tile * 64 + 32
+                    return { x: tx * 64 + 32, y: ty * 64 + 32 };
+                }
+            }
+        }
+    }
+    // Fallback: buscar cualquier tile vacío en el mapa
+    for (let ty = 1; ty < mapa.alto - 1; ty++) {
+        for (let tx = 1; tx < mapa.ancho - 1; tx++) {
+            if (mapa.tiles[ty][tx] === 0) {
+                return { x: tx * 64 + 32, y: ty * 64 + 32 };
+            }
+        }
+    }
+    return { x: 64 + 32, y: 64 + 32 }; // último recurso
 }
 
 // ─── MATCHMAKING ─────────────────────────────────────────────────────────────
+
+// ── Constantes de IA (equivalentes al C) ──────────────────────────────────
+const NPC_RADIO          = 20.0;   // ENEMY_RADIUS del C
+const NPC_ALERT_DIST     = 600.0;  // alertDistance base
+const NPC_SPD            = 2.2;    // velocidad base
+const DT                 = 0.1;    // paso de simulación (100 ms)
+
+// Estados de IA — mirror exacto del enum AIState del C
+const AI_PATROL  = 'patrullar';
+const AI_CHASE   = 'perseguir';
+const AI_STRAFE  = 'strafear';    // en el C: AI_STRAFE  (antes llamado "flanquear" sin posición objetivo)
+const AI_RETREAT = 'retroceder';
+const AI_SHOOT   = 'disparar';
+const AI_FLANK   = 'flanquear';   // en el C: AI_FLANK   (posición objetivo calculada)
+const AI_PINCER  = 'pincer';      // en el C: AI_PINCER  (faltaba completamente)
+
+// ── hasLOS: línea de visión real (igual que el C) ─────────────────────────
+function hasLOS(mapa, x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const d  = Math.sqrt(dx*dx + dy*dy);
+    if (d < 1) return true;
+    const nx = dx/d, ny = dy/d;
+    // Pasos de 10 unidades, igual que el C
+    for (let t = 10; t < d; t += 10) {
+        const cx = Math.floor((x1 + nx*t) / 64);
+        const cy = Math.floor((y1 + ny*t) / 64);
+        if (cy < 0 || cy >= mapa.alto || cx < 0 || cx >= mapa.ancho) return false;
+        if (mapa.tiles[cy][cx] !== 0) return false;
+    }
+    return true;
+}
+
+// ── Colisión con radio AABB (4 esquinas, igual que checkCollisionR del C) ──
+function colisionNPC(mapa, x, y, r) {
+    const radio = r || NPC_RADIO;
+    const corners = [[x+radio, y+radio],[x-radio, y+radio],[x+radio, y-radio],[x-radio, y-radio]];
+    for (const [cx, cy] of corners) {
+        const tx = Math.floor(cx/64), ty = Math.floor(cy/64);
+        if (ty < 0 || ty >= mapa.alto || tx < 0 || tx >= mapa.ancho) return true;
+        if (mapa.tiles[ty][tx] !== 0) return true;
+    }
+    return false;
+}
+
+// ── Generación de NPCs ────────────────────────────────────────────────────
 function generarNPCs(mapa, cantidad, salaId) {
-    const nombres = ['Tlacaelel','Itzcoatl','Cuauhtémoc','Moctezuma','Tezozomoc','Ahuitzotl','Chimalli','Xochitl'];
-    const skins   = ['jaguar','aguila','sacerdote','guerrero_base'];
-    const npcs    = {};
+    const nombres = ['Cortés','Alvarado','Narváez','Velázquez','Sandoval','Olid','Montejo','Portocarrero'];
+    const npcs = {};
+
     for (let i = 0; i < cantidad; i++) {
-        const spawn = mapa.spawns[(i + 1) % mapa.spawns.length];
-        const id    = `npc_${salaId}_${i}`;
+        const id = `npc_${salaId}_${i}`;
+
+        // Buscar posición libre lejos del centro del mapa
+        let spawnX, spawnY;
+        let tries = 0;
+        do {
+            spawnX = (1 + Math.floor(Math.random() * (mapa.ancho - 2))) * 64 + 32;
+            spawnY = (1 + Math.floor(Math.random() * (mapa.alto  - 2))) * 64 + 32;
+            tries++;
+        } while (colisionNPC(mapa, spawnX, spawnY, NPC_RADIO) && tries < 100);
+
         npcs[id] = {
-            id, esNPC: true,
+            id,
+            esNPC: true,
             nombre: nombres[i % nombres.length],
-            skin: skins[i % skins.length],
-            x: (spawn.x + (Math.random()-0.5)) * 64,
-            y: (spawn.y + (Math.random()-0.5)) * 64,
+            skin: 'conquistador',
+            x: spawnX,
+            y: spawnY,
             angle: Math.random() * Math.PI * 2,
-            hp: 100, maxHp: 100, vivo: true,
+            hp: 100, maxHp: 100,
+            vivo: true,
             arma: 0, kills: 0, muertes: 0, monedas: 0,
-            // IA
-            estado: 'patrullar',
-            velX: 0, velY: 0,
-            timerCambio: 0,
-            timerDisparo: 2 + Math.random() * 2
+
+            // IA — mismos campos que el struct Enemy del C
+            estado:       AI_PATROL,
+            aiTimer:      2.0 + Math.random() * 2.0,
+            coordTimer:   0,                          // ← nuevo (coordTimer del C)
+            moveTimer:    0,                          // ← nuevo (moveTimer del C)
+            stuckTimer:   0,                          // ← nuevo (stuckTimer del C)
+            lastValidX:   spawnX,                     // ← nuevo (lastValidX del C)
+            lastValidY:   spawnY,                     // ← nuevo (lastValidY del C)
+            timerDisparo: 2.0 + Math.random() * 2.0,
+            strafeDir:    Math.random() > 0.5 ? 1 : -1,
+            burstCount:   0,
+            burstTimer:   0,
+            retreatTimer: 0,
+            squadRole:    i % 4,                      // roles 0,1,2,3 como en el C
+            alertedBy:    null,
+            flankAngle:   (i % 4) * (Math.PI / 2),   // ← nuevo (flankAngle del C)
+            walkCycle:    Math.random() * Math.PI * 2,
+            alertDistance: NPC_ALERT_DIST
         };
     }
     return npcs;
 }
 
+// ── Disparo de NPC (con detección de hit en jugadores) ───────────────────
+function dispararNPC(sala, io, npc, id, aimAngle, spread = 0.12) {
+    const sp = (Math.random() - 0.5) * spread;
+    const ang = aimAngle + sp;
+    io.to(sala.id).emit('bala_creada', {
+        id:  `nb_${id}_${Date.now()}`,
+        x:   npc.x, y: npc.y,
+        dx:  Math.cos(ang) * 10,
+        dy:  Math.sin(ang) * 10,
+        fromId: id, fromNPC: true,
+        danio: 10, vida: 2.5
+    });
+    // Hit detection inmediato para jugadores cercanos (igual que el C)
+    for (const [sid, jug] of sala.jugadores) {
+        if (!jug.vivo) continue;
+        const dx = jug.x - npc.x, dy = jug.y - npc.y;
+        if (Math.sqrt(dx*dx + dy*dy) < 40) {
+            jug.hp -= 10;
+            io.to(sala.id).emit('jugador_recibio_danio', { id: sid, hp: jug.hp, fromId: id, danio: 10 });
+            if (jug.hp <= 0) {
+                jug.vivo = false; jug.muertes++; npc.kills++;
+                io.to(sala.id).emit('jugador_murio', { id: sid, matadoPor: id, kills: npc.kills, muertes: jug.muertes });
+                setTimeout(() => {
+                    if (!salas.has(sala.id)) return;
+                    const spawn = sala.mapa.spawns[Math.floor(Math.random() * sala.mapa.spawns.length)];
+                    const sp = encontrarSpawnLibre(sala.mapa, spawn.x, spawn.y); jug.x = sp.x; jug.y = sp.y;
+                    jug.hp = jug.maxHp; jug.vivo = true;
+                    io.to(sala.id).emit('jugador_respawn', { id: sid, x: jug.x, y: jug.y, hp: jug.hp });
+                }, 5000);
+            }
+        }
+    }
+}
+
+// ── Loop principal de IA — equivalente a updateEnemies() del C ────────────
 function actualizarNPCs(sala, io) {
     if (!sala.npcs || Object.keys(sala.npcs).length === 0) return;
     const mapa = sala.mapa;
 
+    // ── FASE 1: Compartir alertas (igual que el C) ─────────────────────────
+    for (const id in sala.npcs) {
+        const ei = sala.npcs[id];
+        if (!ei.vivo) continue;
+
+        // Encontrar jugador más cercano visible
+        let minDist = Infinity;
+        for (const [, jug] of sala.jugadores) {
+            if (!jug.vivo) continue;
+            const dx = jug.x - ei.x, dy = jug.y - ei.y;
+            const d = Math.sqrt(dx*dx + dy*dy);
+            if (d < minDist) minDist = d;
+        }
+
+        // Si este NPC ve al jugador, alerta a los cercanos
+        const iSees = minDist < ei.alertDistance && (() => {
+            for (const [, jug] of sala.jugadores) {
+                if (!jug.vivo) continue;
+                if (hasLOS(mapa, ei.x, ei.y, jug.x, jug.y)) return true;
+            }
+            return false;
+        })();
+
+        if (iSees) {
+            for (const id2 in sala.npcs) {
+                if (id2 === id) continue;
+                const ej = sala.npcs[id2];
+                if (!ej.vivo || ej.estado !== AI_PATROL) continue;
+                const dij = Math.sqrt((ei.x - ej.x)**2 + (ei.y - ej.y)**2);
+                if (dij < 300) {
+                    // roles 1 y 2 → flanquean; roles 0 y 3 → persiguen
+                    ej.estado    = (ej.squadRole === 1 || ej.squadRole === 2) ? AI_FLANK : AI_CHASE;
+                    ej.aiTimer   = 1.5;
+                    ej.alertedBy = id;
+                }
+            }
+        }
+    }
+
+    // ── FASE 2: Actualizar cada NPC ───────────────────────────────────────
     for (const id in sala.npcs) {
         const npc = sala.npcs[id];
         if (!npc.vivo) continue;
 
-        // Encontrar jugador humano más cercano
-        let targetX = null, targetY = null, minDist = 999999;
-        for (const [sid, jug] of sala.jugadores) {
+        // Jugador objetivo más cercano CON línea de visión
+        let minDist = Infinity, targetX = null, targetY = null;
+        for (const [, jug] of sala.jugadores) {
             if (!jug.vivo) continue;
             const dx = jug.x - npc.x, dy = jug.y - npc.y;
-            const d = Math.sqrt(dx*dx + dy*dy);
+            const d  = Math.sqrt(dx*dx + dy*dy);
             if (d < minDist) { minDist = d; targetX = jug.x; targetY = jug.y; }
         }
 
-        npc.timerCambio -= 0.1;
-        npc.timerDisparo -= 0.1;
+        // canSee usa hasLOS — igual que el C
+        const canSee = targetX !== null
+            && minDist < npc.alertDistance
+            && hasLOS(mapa, npc.x, npc.y, targetX, targetY);
 
-        if (targetX !== null && minDist < 400) {
-            // Perseguir jugador
-            const dx = targetX - npc.x, dy = targetY - npc.y;
-            const d  = Math.sqrt(dx*dx + dy*dy) || 1;
-            npc.angle = Math.atan2(dy, dx);
-            const spd = 2.2;
-            const nx  = npc.x + (dx/d)*spd;
-            const ny  = npc.y + (dy/d)*spd;
-            // Colisión simple
-            const tx = Math.floor(nx/64), ty = Math.floor(ny/64);
-            if (ty >= 0 && ty < mapa.alto && tx >= 0 && tx < mapa.ancho && mapa.tiles[ty][tx] === 0) {
-                npc.x = nx; npc.y = ny;
-            }
-            // Disparar si está cerca
-            if (npc.timerDisparo <= 0 && minDist < 300) {
-                npc.timerDisparo = 1.5 + Math.random() * 1.5;
-                const spread = (Math.random() - 0.5) * 0.3;
-                io.to(sala.id).emit('bala_creada', {
-                    id: `nb_${id}_${Date.now()}`,
-                    x: npc.x, y: npc.y,
-                    dx: Math.cos(npc.angle + spread) * 10,
-                    dy: Math.sin(npc.angle + spread) * 10,
-                    fromId: id, fromNPC: true,
-                    danio: 10, vida: 2.5
-                });
-                // Verificar hit en jugadores
-                for (const [sid, jug] of sala.jugadores) {
-                    if (!jug.vivo) continue;
-                    const ddx = jug.x - npc.x, ddy = jug.y - npc.y;
-                    if (Math.sqrt(ddx*ddx + ddy*ddy) < 35) {
-                        jug.hp -= 10;
-                        io.to(sala.id).emit('jugador_recibio_danio', { id: sid, hp: jug.hp, fromId: id, danio: 10 });
-                        if (jug.hp <= 0) {
-                            jug.vivo = false; jug.muertes++;
-                            npc.kills++;
-                            io.to(sala.id).emit('jugador_murio', { id: sid, matadoPor: id, kills: npc.kills, muertes: jug.muertes });
-                            setTimeout(() => {
-                                if (!salas.has(sala.id)) return;
-                                const spawn = sala.mapa.spawns[Math.floor(Math.random() * sala.mapa.spawns.length)];
-                                jug.x = spawn.x * 64; jug.y = spawn.y * 64;
-                                jug.hp = jug.maxHp; jug.vivo = true;
-                                io.to(sala.id).emit('jugador_respawn', { id: sid, x: jug.x, y: jug.y, hp: jug.hp });
-                            }, 5000);
-                        }
-                    }
+        const toPlayerAngle = targetX !== null
+            ? Math.atan2(targetY - npc.y, targetX - npc.x)
+            : npc.angle;
+
+        npc.aiTimer    -= DT;
+        npc.coordTimer -= DT;
+        npc.walkCycle  += DT * 4;
+
+        // ── Transiciones de estado (espejo exacto del C) ──────────────────
+        if (canSee) {
+            if (minDist < 120 && npc.estado !== AI_RETREAT) {
+                npc.estado       = AI_RETREAT;
+                npc.retreatTimer = 1.2;
+            } else if (npc.aiTimer <= 0) {
+                const rr = Math.floor(Math.random() * 100);
+
+                if (npc.squadRole === 0) {
+                    // Líder: dispara en bursts, persigue, o strafea
+                    if      (rr < 40) { npc.estado = AI_SHOOT;  npc.aiTimer = 1.5; npc.burstCount = 3 + (Math.random() > 0.5 ? 1 : 0); npc.burstTimer = 0; }
+                    else if (rr < 70) { npc.estado = AI_CHASE;  npc.aiTimer = 0.8; }
+                    else              { npc.estado = AI_STRAFE; npc.aiTimer = 1.0; npc.strafeDir = Math.random() > 0.5 ? 1 : -1; }
+                } else if (npc.squadRole === 1 || npc.squadRole === 2) {
+                    // Flanqueadores: flanquean con posición objetivo, o disparan
+                    if      (rr < 50) { npc.estado = AI_FLANK;  npc.aiTimer = 1.2; }
+                    else if (rr < 75) { npc.estado = AI_SHOOT;  npc.aiTimer = 1.0; npc.burstCount = 2; npc.burstTimer = 0; }
+                    else              { npc.estado = AI_STRAFE; npc.aiTimer = 0.8; npc.strafeDir = npc.squadRole === 1 ? 1 : -1; }
+                } else {
+                    // Role 3: Pincer — rodea al jugador desde el lado opuesto al líder
+                    if      (rr < 35) { npc.estado = AI_PINCER; npc.aiTimer = 1.5; }
+                    else if (rr < 60) { npc.estado = AI_SHOOT;  npc.aiTimer = 1.2; npc.burstCount = 2; npc.burstTimer = 0; }
+                    else              { npc.estado = AI_CHASE;  npc.aiTimer = 0.7; }
                 }
             }
-        } else {
-            // Patrullar
-            if (npc.timerCambio <= 0) {
-                npc.angle = Math.random() * Math.PI * 2;
-                npc.timerCambio = 2 + Math.random() * 3;
+        } else if (npc.aiTimer <= 0 && npc.estado !== AI_PATROL) {
+            npc.estado    = AI_PATROL;
+            npc.aiTimer   = 3.0;
+            npc.alertedBy = null;
+        }
+
+        // ── Comportamiento por estado (espejo del switch del C) ───────────
+        let moveX = 0, moveY = 0;
+
+        switch (npc.estado) {
+
+            case AI_PATROL: {
+                // Patrulla aleatoria — moveTimer controla cambio de ángulo
+                npc.moveTimer += DT;
+                if (npc.moveTimer > 2.5) {
+                    npc.angle     = Math.random() * Math.PI * 2;
+                    npc.moveTimer = 0;
+                }
+                moveX = Math.cos(npc.angle) * NPC_SPD * 0.5;
+                moveY = Math.sin(npc.angle) * NPC_SPD * 0.5;
+                break;
             }
-            const nx = npc.x + Math.cos(npc.angle) * 1.5;
-            const ny = npc.y + Math.sin(npc.angle) * 1.5;
-            const tx = Math.floor(nx/64), ty = Math.floor(ny/64);
-            if (ty >= 0 && ty < mapa.alto && tx >= 0 && tx < mapa.ancho && mapa.tiles[ty][tx] === 0) {
-                npc.x = nx; npc.y = ny;
-            } else {
-                npc.angle += Math.PI / 2;
+
+            case AI_CHASE: {
+                // Persecución directa
+                npc.angle = toPlayerAngle;
+                moveX = Math.cos(npc.angle) * NPC_SPD;
+                moveY = Math.sin(npc.angle) * NPC_SPD;
+                break;
+            }
+
+            case AI_STRAFE: {
+                // Strafeo perpendicular mientras dispara — igual que AI_STRAFE del C
+                npc.angle = toPlayerAngle;
+                const perpS = toPlayerAngle + Math.PI / 2 * npc.strafeDir;
+                moveX = Math.cos(perpS) * NPC_SPD * 0.9;
+                moveY = Math.sin(perpS) * NPC_SPD * 0.9;
+                npc.timerDisparo -= DT;
+                if (npc.timerDisparo <= 0) {
+                    dispararNPC(sala, io, npc, id, toPlayerAngle, 0.12);
+                    npc.timerDisparo = 1.8;
+                }
+                break;
+            }
+
+            case AI_RETREAT: {
+                // Retrocede mientras dispara — igual que AI_RETREAT del C
+                const awayAngle = toPlayerAngle + Math.PI;
+                moveX = Math.cos(awayAngle) * NPC_SPD * 1.1;
+                moveY = Math.sin(awayAngle) * NPC_SPD * 1.1;
+                npc.angle = toPlayerAngle;
+                npc.retreatTimer -= DT;
+                npc.timerDisparo -= DT;
+                if (npc.timerDisparo <= 0) {
+                    dispararNPC(sala, io, npc, id, toPlayerAngle, 0.18);
+                    npc.timerDisparo = 1.0;
+                }
+                if (npc.retreatTimer <= 0) {
+                    npc.estado    = AI_STRAFE;
+                    npc.aiTimer   = 1.0;
+                    npc.strafeDir = Math.random() > 0.5 ? 1 : -1;
+                }
+                break;
+            }
+
+            case AI_SHOOT: {
+                // Dispara en burst con micro-dodge lateral — igual que AI_SHOOT del C
+                npc.angle = toPlayerAngle;
+                npc.burstTimer -= DT;
+                if (npc.burstTimer <= 0 && npc.burstCount > 0) {
+                    dispararNPC(sala, io, npc, id, toPlayerAngle, 0.10);
+                    npc.burstCount--;
+                    npc.burstTimer = 0.18;
+                }
+                // Micro-dodge sinusoidal (igual que el C: dodge = sin(gameTime*8+i)*speed*0.3)
+                const dodge = Math.sin(Date.now() * 0.008 + parseInt(id.split('_').pop())) * NPC_SPD * 0.3;
+                moveX = Math.cos(toPlayerAngle + Math.PI / 2) * dodge;
+                moveY = Math.sin(toPlayerAngle + Math.PI / 2) * dodge;
+                break;
+            }
+
+            case AI_FLANK: {
+                // Flanqueo con POSICIÓN OBJETIVO calculada — igual que AI_FLANK del C
+                npc.angle = toPlayerAngle;
+                const flankOff    = (npc.squadRole === 1) ? Math.PI / 3 : -Math.PI / 3;
+                const targetAngle = toPlayerAngle + flankOff;
+                const approachDist = 200.0;
+                // Punto objetivo: 200 unidades del jugador, desviado 60°
+                const tx = targetX + Math.cos(targetAngle + Math.PI) * approachDist;
+                const ty = targetY + Math.sin(targetAngle + Math.PI) * approachDist;
+                const toTargetA = Math.atan2(ty - npc.y, tx - npc.x);
+                moveX = Math.cos(toTargetA) * NPC_SPD * 1.1;
+                moveY = Math.sin(toTargetA) * NPC_SPD * 1.1;
+                npc.timerDisparo -= DT;
+                if (npc.timerDisparo <= 0 && canSee) {
+                    dispararNPC(sala, io, npc, id, toPlayerAngle, 0.15);
+                    npc.timerDisparo = 2.0;
+                }
+                break;
+            }
+
+            case AI_PINCER: {
+                // Pincer: busca al líder (role 0) y se coloca en el lado OPUESTO al jugador
+                // Igual que AI_PINCER del C
+                let leaderX = targetX, leaderY = targetY;
+                for (const id2 in sala.npcs) {
+                    const n2 = sala.npcs[id2];
+                    if (!n2.vivo || n2.squadRole !== 0 || id2 === id) continue;
+                    const dij = Math.sqrt((n2.x - npc.x)**2 + (n2.y - npc.y)**2);
+                    if (dij < 400) { leaderX = n2.x; leaderY = n2.y; break; }
+                }
+                const leaderAngle  = Math.atan2(leaderY - targetY, leaderX - targetX);
+                const pincerAngle  = leaderAngle + Math.PI;
+                const ptx = targetX + Math.cos(pincerAngle) * 180;
+                const pty = targetY + Math.sin(pincerAngle) * 180;
+                const toTA = Math.atan2(pty - npc.y, ptx - npc.x);
+                moveX = Math.cos(toTA) * NPC_SPD * 1.2;
+                moveY = Math.sin(toTA) * NPC_SPD * 1.2;
+                npc.angle = toPlayerAngle;
+                npc.timerDisparo -= DT;
+                if (npc.timerDisparo <= 0 && canSee) {
+                    dispararNPC(sala, io, npc, id, toPlayerAngle, 0.12);
+                    npc.timerDisparo = 1.5;
+                }
+                break;
             }
         }
 
-        // Broadcast posición NPC
-        io.to(sala.id).emit('jugador_movio', {
-            id, x: npc.x, y: npc.y, angle: npc.angle, arma: 0
-        });
+        // ── Separación entre NPCs (igual que el C: radio 2.5×) ───────────
+        for (const id2 in sala.npcs) {
+            if (id2 === id) continue;
+            const n2 = sala.npcs[id2];
+            if (!n2.vivo) continue;
+            const dij = Math.sqrt((npc.x - n2.x)**2 + (npc.y - n2.y)**2);
+            const sep = NPC_RADIO * 2.5;
+            if (dij < sep && dij > 0.1) {
+                const pushA = Math.atan2(npc.y - n2.y, npc.x - n2.x);
+                const push  = (sep - dij) / sep * NPC_SPD * 0.5;
+                moveX += Math.cos(pushA) * push;
+                moveY += Math.sin(pushA) * push;
+            }
+        }
+
+        // ── Movimiento con colisión por ejes independientes + stuckTimer ──
+        // Equivalente exacto del FIX v15 del C
+        if (moveX !== 0 || moveY !== 0) {
+            const nx2 = npc.x + moveX, ny2 = npc.y + moveY;
+
+            if (!colisionNPC(mapa, nx2, ny2, NPC_RADIO)) {
+                // Movimiento completo
+                npc.x = nx2; npc.y = ny2;
+                npc.lastValidX = nx2; npc.lastValidY = ny2;
+                npc.stuckTimer = 0;
+            } else if (!colisionNPC(mapa, nx2, npc.y, NPC_RADIO)) {
+                // Solo eje X
+                npc.x = nx2;
+                npc.lastValidX = nx2;
+                npc.stuckTimer = 0;
+            } else if (!colisionNPC(mapa, npc.x, ny2, NPC_RADIO)) {
+                // Solo eje Y
+                npc.y = ny2;
+                npc.lastValidY = ny2;
+                npc.stuckTimer = 0;
+            } else {
+                // Completamente bloqueado — acumular stuckTimer y girar
+                npc.stuckTimer += DT;
+                if (npc.stuckTimer > 0.5) {
+                    npc.angle += 1.2 + Math.random() * 1.8;
+                    npc.stuckTimer = 0;
+                }
+            }
+
+            // Garantía final: si de algún modo está en pared, volver a última posición válida
+            if (colisionNPC(mapa, npc.x, npc.y, NPC_RADIO - 2)) {
+                npc.x = npc.lastValidX;
+                npc.y = npc.lastValidY;
+            }
+        }
+
+        io.to(sala.id).emit('jugador_movio', { id, x: npc.x, y: npc.y, angle: npc.angle, arma: 0, estado: npc.estado });
     }
 }
 
+
 function intentarCrearSala() {
-    if (colaEspera.length < 1) return; // ¡1 jugador es suficiente!
+    if (colaEspera.length < 1) return;
 
-    const grupo = colaEspera.splice(0, Math.min(JUGADORES_POR_SALA, colaEspera.length));
-    const salaId = 'sala_' + Date.now();
-    const tipoMapa = MAPAS[Math.floor(Math.random() * MAPAS.length)];
-    const mapa = generarMapa(tipoMapa);
+    const grupo   = colaEspera.splice(0, Math.min(JUGADORES_POR_SALA, colaEspera.length));
+    const salaId  = 'sala_' + Date.now();
 
+    // ── Crear estado de sala via ENGINE ──────────────────────────────────
+    const engineEstado = ENGINE.crearEstadoSala();
+
+    // Registrar jugadores en el engine
+    grupo.forEach(entry => {
+        const jData  = entry.jugadorData;
+        const player = ENGINE.crearJugador(entry.socket.id, jData.nombre, jData.skin || 'guerrero_base', jData.nivel || 1);
+        player.dbId  = jData.dbId;
+        engineEstado.players.set(entry.socket.id, player);
+    });
+
+    // Cargar nivel 1 (posiciona jugadores en spawns seguros)
+    ENGINE.cargarNivel(engineEstado, 1);
+
+    // ── Callbacks del engine → socket broadcasts ──────────────────────
+    engineEstado.onBala = (bala) => {
+        io.to(salaId).emit('bala_creada', bala);
+    };
+    engineEstado.onDanioJugador = (id, hp, fromId, danio) => {
+        const p = engineEstado.players.get(id);
+        if (p && hp <= 0 && p.vivo) {
+            p.vivo = false; p.muertes++;
+            io.to(salaId).emit('jugador_murio', { id, matadoPor: fromId,
+                kills: engineEstado.players.get(fromId)?.kills || 0, muertes: p.muertes });
+            setTimeout(() => {
+                if (!salas.has(salaId)) return;
+                const spawn = engineEstado.mapa.spawns[Math.floor(Math.random()*engineEstado.mapa.spawns.length)];
+                const pos   = ENGINE.spawnSeguro(engineEstado.mapa, spawn.x, spawn.y);
+                p.x=pos.x; p.y=pos.y; p.hp=p.maxHp; p.vivo=true;
+                io.to(salaId).emit('jugador_respawn', { id, x:p.x, y:p.y, hp:p.hp });
+            }, 5000);
+        } else {
+            io.to(salaId).emit('jugador_recibio_danio', { id, hp, fromId, danio });
+        }
+    };
+    engineEstado.onMuerteJugador = (id, matadoPor, kills, muertes) => {
+        io.to(salaId).emit('jugador_murio', { id, matadoPor, kills, muertes });
+    };
+    engineEstado.onMonedaRecogida = (monedaId, jugadorId, total) => {
+        io.to(salaId).emit('moneda_recogida', { monedaId, porId: jugadorId, monedas: total });
+    };
+    engineEstado.onSpawnPickup = (tipo, data) => {
+        io.to(salaId).emit('pickup_spawned', { tipo, data });
+    };
+    engineEstado.onBossUpdate = (bossData) => {
+        io.to(salaId).emit('boss_update', bossData);
+    };
+    engineEstado.onBossMuerto = () => {
+        io.to(salaId).emit('boss_muerto');
+    };
+    engineEstado.onNivelTransicion = (nivelActual, nivelSiguiente) => {
+        if (nivelSiguiente > 3) {
+            // Victoria total
+            terminarPartida(salaId, 'victoria');
+            return;
+        }
+        io.to(salaId).emit('nivel_transicion', { nivelActual, nivelSiguiente });
+        // Después de 4 segundos, cargar el nivel siguiente
+        setTimeout(() => {
+            if (!salas.has(salaId)) return;
+            ENGINE.cargarNivel(engineEstado, nivelSiguiente);
+            // Enviar nuevo estado a todos
+            const jugadoresObj = {};
+            for (const [sid, p] of engineEstado.players) jugadoresObj[sid] = p;
+            const npcsObj = {};
+            for (const e of engineEstado.enemies) npcsObj[e.id] = { ...e, esNPC:true, skin:'conquistador', nombre:e.id };
+            const monedasObj = {};
+            engineEstado.coins.forEach(c => monedasObj[c.id]=c);
+            io.to(salaId).emit('nivel_cargado', {
+                nivel:      nivelSiguiente,
+                mapa:       { tiles: engineEstado.mapa.tiles, ancho: engineEstado.mapa.ancho, alto: engineEstado.mapa.alto },
+                jugadores:  jugadoresObj,
+                npcs:       npcsObj,
+                monedas:    monedasObj,
+            });
+            console.log(`🏛️ Sala ${salaId} → Nivel ${nivelSiguiente}`);
+        }, 4000);
+    };
+    engineEstado.onVictoria = (resultados) => terminarPartida(salaId, 'victoria');
+
+    // ── Construir sala compatible con el resto del servidor ──────────────
     const sala = {
-        id: salaId,
-        mapa,
-        tipoMapa,
-        estado: 'jugando',
-        tiempoInicio: Date.now(),
-        jugadores: new Map(),
-        balas: new Map(),
-        monedas: generarMonedas(mapa),
-        npcs: {},
+        id:          salaId,
+        engine:      engineEstado,
+        mapa:        engineEstado.mapa,
+        tipoMapa:    'templo_1',
+        estado:      'jugando',
+        jugadores:   engineEstado.players,   // alias para compatibilidad
+        npcs:        {},
         timerInterval: null,
-        npcInterval: null
+        engineInterval: null,
     };
 
-    grupo.forEach((entry, i) => {
-        const spawn = mapa.spawns[i % mapa.spawns.length];
-        const jugadorEnSala = {
-            ...entry.jugadorData,
-            socketId: entry.socket.id,
-            x: (spawn.x + (Math.random()-0.5)*0.5) * 64,
-            y: (spawn.y + (Math.random()-0.5)*0.5) * 64,
-            angle: Math.random() * Math.PI * 2,
-            hp: 100,
-            maxHp: 100,
-            kills: 0,
-            muertes: 0,
-            monedas: 0,
-            arma: 'macuahuitl',
-            vivo: true,
-            respawnTimer: 0
-        };
-        sala.jugadores.set(entry.socket.id, jugadorEnSala);
+    // Emitir partida_iniciada a cada jugador
+    grupo.forEach(entry => {
+        const player = engineEstado.players.get(entry.socket.id);
         entry.socket.join(salaId);
         entry.socket.data.salaId = salaId;
+
+        const jugadoresObj = {};
+        for (const [sid, p] of engineEstado.players) jugadoresObj[sid] = { ...p };
+        const npcsObj = {};
+        for (const e of engineEstado.enemies)
+            npcsObj[e.id] = { ...e, esNPC:true, skin:'conquistador', nombre:e.id };
+        const monedasObj = {};
+        engineEstado.coins.forEach(c => monedasObj[c.id]=c);
+
         entry.socket.emit('partida_iniciada', {
             salaId,
-            mapa: { tiles: mapa.tiles, ancho: mapa.ancho, alto: mapa.alto },
-            tipoMapa,
-            jugadores: Object.fromEntries(sala.jugadores),
-            tuId: entry.socket.id,
-            tiempoTotal: TIEMPO_PARTIDA
+            mapa:      { tiles: engineEstado.mapa.tiles, ancho: engineEstado.mapa.ancho, alto: engineEstado.mapa.alto },
+            tipoMapa:  'templo_1',
+            jugadores: jugadoresObj,
+            tuId:      entry.socket.id,
+            tiempoTotal: 0, // sin límite
+            nivel:     1,
+            npcs:      npcsObj,
+            monedas:   monedasObj,
         });
     });
 
     salas.set(salaId, sala);
-    console.log(`🏛️  Sala ${salaId} creada con ${grupo.length} jugadores — mapa: ${tipoMapa}`);
+    console.log(`🏛️  Sala ${salaId} — ${grupo.length} jugadores, nivel 1`);
 
-    // Generar NPCs si hay pocos jugadores humanos
-    const numNPCs = Math.max(0, NPCS_BASE - (grupo.length - 1));
-    if (numNPCs > 0) {
-        sala.npcs = generarNPCs(mapa, numNPCs, salaId);
-        // Notificar a todos los jugadores de los NPCs
-        const npcData = {};
-        for (const id in sala.npcs) npcData[id] = sala.npcs[id];
-        io.to(salaId).emit('npcs_spawned', npcData);
-        console.log(`🤖 ${numNPCs} NPCs generados para sala ${salaId}`);
-        // Loop de IA de NPCs cada 100ms
-        sala.npcInterval = setInterval(() => {
-            if (!salas.has(salaId)) { clearInterval(sala.npcInterval); return; }
-            actualizarNPCs(sala, io);
-        }, 100);
-    }
+    // ── Loop del ENGINE cada 100ms ────────────────────────────────────────
+    sala.engineInterval = setInterval(() => {
+        if (!salas.has(salaId)) { clearInterval(sala.engineInterval); return; }
+        const DT = 0.1;
+        ENGINE.tick(engineEstado, DT);
 
-    // Timer de la partida
-    let tiempoRestante = TIEMPO_PARTIDA;
-    sala.timerInterval = setInterval(() => {
-        tiempoRestante--;
-        io.to(salaId).emit('tick_timer', { tiempoRestante });
-        if (tiempoRestante <= 0) terminarPartida(salaId, 'tiempo');
-    }, 1000);
+        // Broadcast posiciones de enemigos (NPCs del engine)
+        for (const e of engineEstado.enemies) {
+            if (!e.active) continue;
+            io.to(salaId).emit('jugador_movio', {
+                id: e.id, x: e.x, y: e.y, angle: e.angle, arma: 0, estado: e.estado
+            });
+        }
+
+        // Tick timer (cronómetro ascendente)
+        io.to(salaId).emit('tick_timer', {
+            playTimer: engineEstado.playTimer,
+            nivel:     engineEstado.level,
+        });
+    }, 100);
 }
 
 function generarMonedas(mapa) {
@@ -339,12 +736,16 @@ async function terminarPartida(salaId, razon) {
     if (!sala || sala.estado === 'terminada') return;
     sala.estado = 'terminada';
     clearInterval(sala.timerInterval);
-    if (sala.npcInterval) clearInterval(sala.npcInterval);
+    if (sala.npcInterval)    clearInterval(sala.npcInterval);
+    if (sala.engineInterval) clearInterval(sala.engineInterval);
 
-    // Calcular ranking de la sala
-    const resultados = Array.from(sala.jugadores.values())
+    // Calcular ranking usando engine si está disponible
+    const jugadoresFuente = sala.engine
+        ? [...sala.engine.players.values()]
+        : Array.from(sala.jugadores.values());
+    const resultados = jugadoresFuente
         .sort((a,b) => b.kills - a.kills || a.muertes - b.muertes)
-        .map((j,i) => ({ ...j, posicion: i+1 }));
+        .map((j,i) => ({ ...j, posicion: i+1, tiempo: sala.engine?.playTimer || 0 }));
 
     io.to(salaId).emit('partida_terminada', { razon, resultados });
 
@@ -362,7 +763,7 @@ async function terminarPartida(salaId, razon) {
             await pool.query(
                 `INSERT INTO partida_jugadores (partida_id,jugador_id,kills,muertes,monedas_ganadas,experiencia_ganada,posicion_final)
                  VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-                [partidaId, j.dbId, j.kills, j.muertes, j.monedas, xpGanada, j.posicion]
+                [partidaId, j.dbId, j.kills, j.muertes, j.gold||j.monedas||0, xpGanada, j.posicion]
             );
             await pool.query(
                 `UPDATE jugadores SET
@@ -374,7 +775,7 @@ async function terminarPartida(salaId, razon) {
                     partidas_ganadas = partidas_ganadas + $5,
                     nivel = GREATEST(nivel, FLOOR(SQRT((experiencia+$4)/100))::int + 1)
                  WHERE id = $6`,
-                [j.kills, j.muertes, j.monedas, xpGanada, j.posicion===1?1:0, j.dbId]
+                [j.kills, j.muertes, j.gold||j.monedas||0, xpGanada, j.posicion===1?1:0, j.dbId]
             );
         }
     } catch(e) { console.error('Error guardando stats:', e.message); }
@@ -426,28 +827,26 @@ io.on('connection', (socket) => {
             const jugadorEnSala = {
                 ...jugadorData,
                 socketId: socket.id,
-                x: spawn.x * 64, y: spawn.y * 64,
+                x: encontrarSpawnLibre(salaEnCurso.mapa, spawn.x, spawn.y).x, y: encontrarSpawnLibre(salaEnCurso.mapa, spawn.x, spawn.y).y,
                 angle: Math.random() * Math.PI * 2,
             };
             salaEnCurso.jugadores.set(socket.id, jugadorEnSala);
             socket.join(salaEnCurso.id);
             socket.data.salaId = salaEnCurso.id;
+            // Incluir monedas activas y NPCs en el payload — fix: antes se perdian
             socket.emit('partida_iniciada', {
                 salaId: salaEnCurso.id,
                 mapa: { tiles: salaEnCurso.mapa.tiles, ancho: salaEnCurso.mapa.ancho, alto: salaEnCurso.mapa.alto },
                 tipoMapa: salaEnCurso.tipoMapa,
                 jugadores: Object.fromEntries(salaEnCurso.jugadores),
                 tuId: socket.id,
-                tiempoTotal: TIEMPO_PARTIDA
+                tiempoTotal: TIEMPO_PARTIDA,
+                npcs: salaEnCurso.npcs || {},
+                monedas: Object.fromEntries(salaEnCurso.monedas)
             });
-            // Notificar NPCs al nuevo jugador
-            if (salaEnCurso.npcs && Object.keys(salaEnCurso.npcs).length > 0) {
-                socket.emit('npcs_spawned', salaEnCurso.npcs);
-            }
-            // Avisar a los demás del nuevo jugador
+            // Avisar a los demas del nuevo jugador
             socket.to(salaEnCurso.id).emit('jugador_unido', { id: socket.id, ...jugadorEnSala });
-            showToast && showToast(`${j.nombre} se unió a la batalla`);
-            console.log(`⚔️ ${j.nombre} se unió a sala en curso ${salaEnCurso.id}`);
+            console.log(`⚔️ ${j.nombre} se unio a sala en curso ${salaEnCurso.id}`);
             return;
         }
 
@@ -467,15 +866,49 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('confirmar_sala', (salaId) => {
-        socket.data.salaId = salaId;
-        socket.join(salaId);
+    // ── Reconexión desde game.html (nuevo socket, mismo jugador) ──
+    socket.on('reconectar_sala', ({ salaId, socketIdAnterior }) => {
+        if (!salaId) return;
         const sala = salas.get(salaId);
-        if (sala) {
-            // Re-enviar estado completo de jugadores
-            socket.emit('sync_jugadores', Object.fromEntries(sala.jugadores));
-            console.log(`✅ Sala confirmada para ${j.nombre}: ${salaId}`);
+        if (!sala) { console.warn(`reconectar: sala ${salaId} no encontrada`); return; }
+
+        // Transferir datos del jugador del socket anterior al nuevo
+        const jugadorAnterior = sala.jugadores.get(socketIdAnterior);
+        if (jugadorAnterior) {
+            // Mover al jugador al nuevo socket id
+            sala.jugadores.delete(socketIdAnterior);
+            jugadorAnterior.socketId = socket.id;
+            sala.jugadores.set(socket.id, jugadorAnterior);
+            // También actualizar en el engine si existe
+            if (sala.engine) {
+                const ep = sala.engine.players.get(socketIdAnterior);
+                if (ep) {
+                    sala.engine.players.delete(socketIdAnterior);
+                    sala.engine.players.set(socket.id, ep);
+                }
+            }
+            console.log(`🔄 Reconectado: ${jugadorAnterior.nombre} (${socketIdAnterior} → ${socket.id})`);
         }
+
+        // Unir al nuevo socket al room de la sala
+        socket.join(salaId);
+        socket.data.salaId = salaId;
+
+        // Enviar estado actual de todos los jugadores al reconectado
+        const jugadoresObj = {};
+        for (const [sid, p] of sala.jugadores) jugadoresObj[sid] = { ...p };
+        socket.emit('sync_estado', {
+            jugadores: jugadoresObj,
+            tuId: socket.id,
+            npcs: sala.npcs || {}
+        });
+
+        // Avisar a los demás que este jugador tiene nuevo id
+        socket.to(salaId).emit('jugador_cambio_id', {
+            idAnterior: socketIdAnterior,
+            idNuevo: socket.id,
+            jugador: jugadorAnterior || {}
+        });
     });
 
     // ── Cancelar búsqueda ──
@@ -486,14 +919,7 @@ io.on('connection', (socket) => {
 
     // ── Movimiento del jugador ──
     socket.on('mover', (data) => {
-        // Buscar la sala del socket de forma robusta
-        let salaId = socket.data.salaId;
-        // Si no está en socket.data, buscarlo en todas las salas
-        if (!salaId) {
-            for (const [sid, s] of salas) {
-                if (s.jugadores.has(socket.id)) { salaId = sid; socket.data.salaId = sid; break; }
-            }
-        }
+        const salaId = socket.data.salaId;
         const sala = salas.get(salaId);
         if (!sala) return;
         const jugador = sala.jugadores.get(socket.id);
@@ -502,98 +928,79 @@ io.on('connection', (socket) => {
         jugador.x     = data.x;
         jugador.y     = data.y;
         jugador.angle = data.angle;
-
-        // Broadcast a TODOS en la sala (incluyendo al emisor para confirmación)
-        // Usamos io.to en vez de socket.to para asegurar entrega
+        // Sincronizar con engine si existe
+        if (sala.engine) {
+            const ep = sala.engine.players.get(socket.id);
+            if (ep) { ep.x=data.x; ep.y=data.y; ep.angle=data.angle; }
+        }
+        // Broadcast a los demás en la sala
         socket.to(salaId).emit('jugador_movio', {
             id: socket.id,
             x: data.x, y: data.y, angle: data.angle,
-            arma: jugador.arma
+            arma: jugador.arma || 0,
+            skin: jugador.skin
         });
     });
 
     // ── Disparo ──
     socket.on('disparar', (data) => {
         const salaId = socket.data.salaId;
-        const sala = salas.get(salaId);
-        if (!sala) return;
-        const tirador = sala.jugadores.get(socket.id);
-        if (!tirador || !tirador.vivo) return;
-
-        const balaId = `b_${socket.id}_${Date.now()}`;
-        const bala = {
-            id: balaId,
-            x: data.x, y: data.y,
-            dx: data.dx, dy: data.dy,
-            danio: data.danio || 15,
-            fromId: socket.id,
-            vida: 2.5
-        };
-        sala.balas.set(balaId, bala);
-
-        // Broadcast bala a todos en la sala
-        io.to(salaId).emit('bala_creada', bala);
-
-        // Detección de hit en servidor
-        for (const [sid, objetivo] of sala.jugadores) {
-            if (sid === socket.id || !objetivo.vivo) continue;
-            const dx = objetivo.x - data.x;
-            const dy = objetivo.y - data.y;
-            const dist = Math.sqrt(dx*dx + dy*dy);
-            if (dist < 30) {
-                objetivo.hp -= bala.danio;
-                sala.balas.delete(balaId);
-                io.to(salaId).emit('jugador_recibio_danio', {
-                    id: sid, hp: objetivo.hp,
-                    fromId: socket.id, danio: bala.danio
-                });
-                if (objetivo.hp <= 0) {
-                    objetivo.vivo = false;
-                    objetivo.muertes++;
-                    tirador.kills++;
-                    tirador.monedas += 50;
-                    io.to(salaId).emit('jugador_murio', {
-                        id: sid,
-                        matadoPor: socket.id,
-                        kills: tirador.kills,
-                        muertes: objetivo.muertes
-                    });
-                    // Respawn en 5 segundos
-                    setTimeout(() => {
-                        if (!salas.has(salaId)) return;
-                        const spawn = sala.mapa.spawns[Math.floor(Math.random()*sala.mapa.spawns.length)];
-                        objetivo.x = spawn.x * 64;
-                        objetivo.y = spawn.y * 64;
-                        objetivo.hp = objetivo.maxHp;
-                        objetivo.vivo = true;
-                        io.to(salaId).emit('jugador_respawn', {
-                            id: sid, x: objetivo.x, y: objetivo.y,
-                            hp: objetivo.hp
-                        });
-                    }, 5000);
-                    // Verificar si queda 1 jugador
-                    const vivos = Array.from(sala.jugadores.values()).filter(j2 => j2.vivo).length;
-                    if (vivos <= 1) terminarPartida(salaId, 'eliminacion');
-                }
-                break;
-            }
-        }
+        const sala   = salas.get(salaId);
+        if (!sala || !sala.engine) return;
+        // Delegar al ENGINE — maneja hits, daño, drops, todo
+        const player = sala.engine.players.get(socket.id);
+        if (!player) return;
+        // Sincronizar posición reportada por el cliente
+        player.x = data.x; player.y = data.y;
+        ENGINE.jugadorDispara(sala.engine, socket.id, data.angle ?? Math.atan2(data.dy, data.dx));
     });
 
     // ── Recoger moneda ──
     socket.on('recoger_moneda', (monedaId) => {
         const salaId = socket.data.salaId;
-        const sala = salas.get(salaId);
-        if (!sala) return;
-        const moneda = sala.monedas.get(monedaId);
-        if (!moneda) return;
-        const jugador = sala.jugadores.get(socket.id);
-        if (!jugador) return;
-        jugador.monedas += moneda.valor;
-        sala.monedas.delete(monedaId);
-        io.to(salaId).emit('moneda_recogida', {
-            monedaId, porId: socket.id, monedas: jugador.monedas
-        });
+        const sala   = salas.get(salaId);
+        if (!sala?.engine) return;
+        const eng = sala.engine;
+        const idx = eng.coins.findIndex(c => c.id === monedaId);
+        if (idx === -1) return;
+        const moneda  = eng.coins[idx];
+        const player  = eng.players.get(socket.id);
+        if (!player) return;
+        player.gold  += moneda.valor;
+        eng.coins.splice(idx, 1);
+        io.to(salaId).emit('moneda_recogida', { monedaId, porId: socket.id, monedas: player.gold });
+    });
+
+    // ── Recoger corazón ──
+    socket.on('recoger_corazon', (id) => {
+        const salaId = socket.data.salaId;
+        const sala   = salas.get(salaId);
+        if (!sala?.engine) return;
+        const eng = sala.engine;
+        const idx = eng.hearts.findIndex(h => h.id === id);
+        if (idx === -1) return;
+        const heart  = eng.hearts[idx];
+        const player = eng.players.get(socket.id);
+        if (!player) return;
+        player.hp = Math.min(player.maxHp, player.hp + heart.heal);
+        eng.hearts.splice(idx, 1);
+        io.to(salaId).emit('corazon_recogido', { id, porId: socket.id, hp: player.hp });
+    });
+
+    // ── Recoger munición ──
+    socket.on('recoger_ammo', (id) => {
+        const salaId = socket.data.salaId;
+        const sala   = salas.get(salaId);
+        if (!sala?.engine) return;
+        const eng = sala.engine;
+        const idx = eng.ammoDrops.findIndex(a => a.id === id);
+        if (idx === -1) return;
+        const drop   = eng.ammoDrops[idx];
+        const player = eng.players.get(socket.id);
+        if (!player) return;
+        player.ammo = Math.min(999, player.ammo + drop.amount);
+        eng.ammoDrops.splice(idx, 1);
+        io.to(salaId).emit('ammo_recogido', { id, porId: socket.id, ammo: player.ammo });
     });
 
     // ── Chat en sala ──
