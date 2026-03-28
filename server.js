@@ -928,12 +928,15 @@ io.on('connection', (socket) => {
             const ep = sala.engine.players.get(socket.id);
             if (ep) { ep.x=data.x; ep.y=data.y; ep.angle=data.angle; }
         }
-        // Broadcast a los demás en la sala
+        // Broadcast a los demás — incluir idAnterior por si algún cliente
+        // todavía tiene al jugador registrado con su socket id anterior
         socket.to(salaId).emit('jugador_movio', {
-            id: socket.id,
+            id:         socket.id,
+            idAnterior: socket.data.socketIdAnterior || socket.id,
             x: data.x, y: data.y, angle: data.angle,
             arma: jugador.arma || 0,
-            skin: jugador.skin
+            skin: jugador.skin,
+            nombre: jugador.nombre
         });
     });
 

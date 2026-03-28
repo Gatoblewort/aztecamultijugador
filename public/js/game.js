@@ -222,12 +222,34 @@ function conectarSocket(token, salaId) {
     });
 
     // Movimiento de otros jugadores/NPCs
-    socket.on('jugador_movio', ({id,x,y,angle,arma,estado}) => {
-        if (!jugadores[id]) jugadores[id]={nombre:id.startsWith('npc_')?id.split('_')[2]||'NPC':id,
-            vivo:true,hp:100,maxHp:100,esNPC:id.startsWith('npc_'),skin:'conquistador'};
-        jugadores[id].x=x; jugadores[id].y=y;
-        jugadores[id].angle=angle; jugadores[id].arma=arma;
-        if (estado!==undefined) jugadores[id].estado=estado;
+    socket.on('jugador_movio', ({id, idAnterior, x, y, angle, arma, estado, skin, nombre}) => {
+        if (id === miId) return; // ignorar el nuestro
+
+        // Determinar qué id tenemos almacenado para este jugador
+        // Puede estar con id nuevo o con idAnterior
+        let claveReal = id;
+        if (!jugadores[id] && idAnterior && jugadores[idAnterior]) {
+            // Migrar al nuevo id
+            jugadores[id] = jugadores[idAnterior];
+            delete jugadores[idAnterior];
+            claveReal = id;
+        }
+
+        if (!jugadores[claveReal]) {
+            jugadores[claveReal] = {
+                nombre: nombre || (id.startsWith('npc_') ? id.split('_')[2]||'NPC' : '?'),
+                vivo: true, hp: 100, maxHp: 100,
+                esNPC: id.startsWith('npc_'),
+                skin: skin || 'conquistador'
+            };
+        }
+        jugadores[claveReal].x     = x;
+        jugadores[claveReal].y     = y;
+        jugadores[claveReal].angle = angle;
+        jugadores[claveReal].arma  = arma;
+        if (skin)   jugadores[claveReal].skin   = skin;
+        if (nombre) jugadores[claveReal].nombre = nombre;
+        if (estado !== undefined) jugadores[claveReal].estado = estado;
     });
 
     socket.on('npcs_spawned', npcs => {
