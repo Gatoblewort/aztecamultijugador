@@ -888,6 +888,7 @@ io.on('connection', (socket) => {
                     sala.engine.players.set(socket.id, ep);
                 }
             }
+            jugadorAnterior._desconectando = false; // cancelar grace period
             console.log(`🔄 Reconectado: ${jugadorAnterior.nombre} (${socketIdAnterior} → ${socket.id})`);
         }
 
@@ -1030,9 +1031,32 @@ io.on('connection', (socket) => {
         if (salaId) {
             const sala = salas.get(salaId);
             if (sala) {
-                sala.jugadores.delete(socket.id);
+                // NO borrar al jugador todavía — puede ser transición lobby→game.html
+                // Marcar como desconectado temporalmente
+                const jug = sala.jugadores.get(socket.id);
+                if (jug) jug._desconectando = true;
+
                 io.to(salaId).emit('jugador_salio', { id: socket.id });
-                if (sala.jugadores.size < 1) terminarPartida(salaId, 'abandono');
+
+                // Grace period de 15s — si nadie reconecta, terminar partida
+                setTimeout(() => {
+                    if (!salas.has(salaId)) return;
+                    const salaActual = salas.get(salaId);
+                    if (!salaActual) return;
+
+                    // Limpiar jugadores que siguen marcados como desconectando
+                    for (const [sid, p] of salaActual.jugadores) {
+                        if (p._desconectando) {
+                            salaActual.jugadores.delete(sid);
+                            if (salaActual.engine) salaActual.engine.players.delete(sid);
+                            console.log(`🗑️ Jugador ${p.nombre} removido tras grace period`);
+                        }
+                    }
+
+                    if (salaActual.jugadores.size < 1) {
+                        terminarPartida(salaId, 'abandono');
+                    }
+                }, 15000); // 15 segundos de gracia
             }
         }
     });
