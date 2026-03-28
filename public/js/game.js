@@ -193,12 +193,32 @@ function tileToTex(t){const m={1:1,2:2,3:3,4:4,5:5,6:6,7:7};return m[t]||1;}
 
 // ── Socket ────────────────────────────────────────────────────────────────
 function conectarSocket(token, salaId) {
-    socket = io({ auth:{ token, salaId, socketIdAnterior: miId } });
+    socket = io({
+        auth: {
+            token,
+            salaId,
+            socketIdAnterior: miId   // el tuId que llegó en partida_iniciada
+        }
+    });
 
     socket.on('connect', () => {
-        console.log('🟢 Socket conectado, nuevo id:', socket.id);
-        // Notificar al servidor que este nuevo socket reemplaza al anterior
-        socket.emit('reconectar_sala', { salaId, socketIdAnterior: miId });
+        console.log('🟢 Socket conectado. Nuevo id:', socket.id, '| Anterior:', miId);
+        // Actualizar miId al nuevo socket id
+        if (jugadores[miId]) {
+            jugadores[socket.id] = jugadores[miId];
+            delete jugadores[miId];
+        }
+        miId = socket.id;
+        yo   = jugadores[miId];
+    });
+
+    // Otro jugador se reconectó con nuevo id — actualizar referencia local
+    socket.on('jugador_cambio_id', ({ idAnterior, idNuevo }) => {
+        if (jugadores[idAnterior]) {
+            jugadores[idNuevo] = jugadores[idAnterior];
+            delete jugadores[idAnterior];
+        }
+        console.log(`🔄 Jugador: ${idAnterior} → ${idNuevo}`);
     });
 
     // Movimiento de otros jugadores/NPCs
@@ -304,34 +324,6 @@ function conectarSocket(token, salaId) {
     });
 
     socket.on('chat_msg', ({nombre,msg}) => addChat(nombre,msg));
-
-    socket.on('sync_estado', ({ jugadores: jugs, tuId, npcs }) => {
-        // Actualizar miId con el nuevo socket id
-        const datosAntiguo = jugadores[miId];
-        miId = tuId;
-        // Recargar jugadores con estado actual del servidor
-        for (const id in jugs) {
-            if (id === miId) {
-                jugadores[miId] = { ...(datosAntiguo||{}), ...jugs[id] };
-                yo = jugadores[miId];
-            } else {
-                jugadores[id] = { ...jugs[id] };
-            }
-        }
-        if (npcs) for (const id in npcs) jugadores[id] = { ...npcs[id] };
-        console.log('🔄 Estado sincronizado, miId:', miId);
-    });
-
-    socket.on('jugador_cambio_id', ({ idAnterior, idNuevo, jugador: jug }) => {
-        // Otro jugador se reconectó con nuevo socket id
-        if (jugadores[idAnterior]) {
-            jugadores[idNuevo] = { ...jugadores[idAnterior], ...jug };
-            delete jugadores[idAnterior];
-        } else {
-            jugadores[idNuevo] = { ...jug };
-        }
-        console.log(`🔄 Jugador cambió id: ${idAnterior} → ${idNuevo}`);
-    });
 
     socket.on('jugador_salio', ({id}) => { delete jugadores[id]; });
     socket.on('jugador_unido', jug => { jugadores[jug.id]=jug; });

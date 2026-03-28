@@ -790,6 +790,15 @@ io.use((socket, next) => {
     try {
         const payload = jwt.verify(token, process.env.JWT_SECRET || 'aztec_secret_2024');
         socket.data.jugador = payload;
+
+        // Si viene con salaId y socketIdAnterior (reconexión desde game.html),
+        // mapear automáticamente el nuevo socket al jugador existente
+        const salaId          = socket.handshake.auth?.salaId;
+        const socketIdAnterior= socket.handshake.auth?.socketIdAnterior;
+        if (salaId && socketIdAnterior) {
+            socket.data.salaId          = salaId;
+            socket.data.socketIdAnterior= socketIdAnterior;
+        }
         next();
     } catch { next(new Error('Token inválido')); }
 });
@@ -797,6 +806,37 @@ io.use((socket, next) => {
 io.on('connection', (socket) => {
     const j = socket.data.jugador;
     console.log(`🟢 Conectado: ${j.nombre} (${socket.id})`);
+
+    // Auto-reconexión: si viene de game.html con salaId previo
+    if (socket.data.salaId && socket.data.socketIdAnterior) {
+        const salaId          = socket.data.salaId;
+        const socketIdAnterior= socket.data.socketIdAnterior;
+        const sala = salas.get(salaId);
+        if (sala) {
+            // Transferir jugador del socket anterior al nuevo
+            const jugadorAnterior = sala.jugadores.get(socketIdAnterior);
+            if (jugadorAnterior) {
+                sala.jugadores.delete(socketIdAnterior);
+                jugadorAnterior.socketId = socket.id;
+                sala.jugadores.set(socket.id, jugadorAnterior);
+                // Transferir en engine si existe
+                if (sala.engine) {
+                    const ep = sala.engine.players.get(socketIdAnterior);
+                    if (ep) {
+                        sala.engine.players.delete(socketIdAnterior);
+                        sala.engine.players.set(socket.id, ep);
+                    }
+                }
+                console.log(`🔄 ${j.nombre}: ${socketIdAnterior} → ${socket.id}`);
+            }
+            socket.join(salaId);
+            // Notificar a los demás del cambio de id
+            socket.to(salaId).emit('jugador_cambio_id', {
+                idAnterior: socketIdAnterior,
+                idNuevo:    socket.id
+            });
+        }
+    }
 
     // ── Buscar partida ──
     socket.on('buscar_partida', async (skinData) => {
@@ -864,51 +904,6 @@ io.on('connection', (socket) => {
                 if (colaEspera.length >= 1) intentarCrearSala();
             }, 30000);
         }
-    });
-
-    // ── Reconexión desde game.html (nuevo socket, mismo jugador) ──
-    socket.on('reconectar_sala', ({ salaId, socketIdAnterior }) => {
-        if (!salaId) return;
-        const sala = salas.get(salaId);
-        if (!sala) { console.warn(`reconectar: sala ${salaId} no encontrada`); return; }
-
-        // Transferir datos del jugador del socket anterior al nuevo
-        const jugadorAnterior = sala.jugadores.get(socketIdAnterior);
-        if (jugadorAnterior) {
-            // Mover al jugador al nuevo socket id
-            sala.jugadores.delete(socketIdAnterior);
-            jugadorAnterior.socketId = socket.id;
-            sala.jugadores.set(socket.id, jugadorAnterior);
-            // También actualizar en el engine si existe
-            if (sala.engine) {
-                const ep = sala.engine.players.get(socketIdAnterior);
-                if (ep) {
-                    sala.engine.players.delete(socketIdAnterior);
-                    sala.engine.players.set(socket.id, ep);
-                }
-            }
-            console.log(`🔄 Reconectado: ${jugadorAnterior.nombre} (${socketIdAnterior} → ${socket.id})`);
-        }
-
-        // Unir al nuevo socket al room de la sala
-        socket.join(salaId);
-        socket.data.salaId = salaId;
-
-        // Enviar estado actual de todos los jugadores al reconectado
-        const jugadoresObj = {};
-        for (const [sid, p] of sala.jugadores) jugadoresObj[sid] = { ...p };
-        socket.emit('sync_estado', {
-            jugadores: jugadoresObj,
-            tuId: socket.id,
-            npcs: sala.npcs || {}
-        });
-
-        // Avisar a los demás que este jugador tiene nuevo id
-        socket.to(salaId).emit('jugador_cambio_id', {
-            idAnterior: socketIdAnterior,
-            idNuevo: socket.id,
-            jugador: jugadorAnterior || {}
-        });
     });
 
     // ── Cancelar búsqueda ──
