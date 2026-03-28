@@ -54,6 +54,8 @@ function crearEstadoSala() {
         onBala:         null,  // (balaData) → broadcast
         onDanioJugador: null,  // (id, hp, fromId, danio)
         onMuerteJugador:null,  // (id, matadorId, kills, muertes)
+        onMuerteNPC:    null,  // (npcId, matadorId, kills) ← nuevo
+        onDanioNPC:     null,  // (npcId, hp)              ← nuevo
         onRespawn:      null,  // (id, x, y, hp)
         onMonedaRecogida: null,// (monedaId, jugadorId, totalMonedas)
         onNivelTransicion: null,// (nivelActual, nivelSiguiente)
@@ -363,6 +365,8 @@ function updateBullets(estado, dt) {
                         e.hp -= b.danio;
                         b.active = true; // se destruye debajo
                         hit = true;
+                        // Notificar daño al NPC
+                        if (estado.onDanioNPC) estado.onDanioNPC(e.id, e.hp);
                         if (e.hp <= 0) {
                             e.active = false;
                             // Dar recompensa al tirador
@@ -371,6 +375,9 @@ function updateBullets(estado, dt) {
                                 tirador.kills++;
                                 tirador.gold += 50 + level * 25;
                             }
+                            // Notificar muerte del NPC al servidor para broadcast
+                            if (estado.onMuerteNPC)
+                                estado.onMuerteNPC(e.id, b.fromId, tirador?.kills ?? 0);
                             // Spawn drops
                             estado.coins.push({ id:`dc_${Date.now()}`, x:e.x, y:e.y,
                                 valor:50+level*25, bob:Math.random()*6.28 });

@@ -613,6 +613,19 @@ function intentarCrearSala() {
     engineEstado.onSpawnPickup = (tipo, data) => {
         io.to(salaId).emit('pickup_spawned', { tipo, data });
     };
+    // ── Daño y muerte de NPCs (enemigos del engine) ───────────────────
+    engineEstado.onDanioNPC = (npcId, hp) => {
+        io.to(salaId).emit('jugador_recibio_danio', { id: npcId, hp, fromId: null, danio: 0 });
+    };
+    engineEstado.onMuerteNPC = (npcId, matadorId, kills) => {
+        // Emitir muerte — el cliente borrará el NPC al recibir esto
+        io.to(salaId).emit('jugador_murio', {
+            id:        npcId,
+            matadoPor: matadorId,
+            kills,
+            muertes:   0,
+        });
+    };
     engineEstado.onBossUpdate = (bossData) => {
         io.to(salaId).emit('boss_update', bossData);
     };
