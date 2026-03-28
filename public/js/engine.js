@@ -443,7 +443,7 @@ function updateBullets(estado, dt) {
                         let dmgReal = b.danio;
                         if (level === 3) dmgReal = Math.floor(dmgReal * 0.6);
                         target.hp -= dmgReal;
-                        target.invulTime = 0.6;
+                        target.invulTime = 1.2;
                         hit = true;
                         b.active = false;
                         if (estado.onDanioJugador)
@@ -526,7 +526,7 @@ function updateBoss(estado, dt) {
         const shots = boss.phase===2 ? 5 : 3;
         for (let i=0; i<shots; i++) {
             const spread = (i/shots - 0.5) * 0.4;
-            dispararBala(estado, boss.x, boss.y, boss.angle+spread, false, 'boss', 20+boss.phase*5, 10);
+            dispararBala(estado, boss.x, boss.y, boss.angle+spread, false, 'boss', 10+boss.phase*3, 10);
         }
         boss.shootTimer = boss.phase===2 ? 0.8 : 1.4;
     }
@@ -535,7 +535,7 @@ function updateBoss(estado, dt) {
     for (const [sid, p] of players) {
         if (!p.vivo || p.invulTime > 0) continue;
         if (nearDist < 60) {
-            const dmg = boss.phase===2 ? 9 : 6;
+            const dmg = boss.phase===2 ? 5 : 3;
             p.hp -= dmg; p.invulTime = 1.0;
             if (estado.onDanioJugador) estado.onDanioJugador(sid, p.hp, 'boss', dmg);
             if (p.hp <= 0) {
@@ -637,7 +637,7 @@ function updateEnemigos(estado, dt) {
                   mx=Math.cos(perp)*spd*0.9; my=Math.sin(perp)*spd*0.9; }
                 e.shootTimer-=DT;
                 if (e.shootTimer<=0) {
-                    dispararBala(estado,e.x,e.y,toPA+(Math.random()-.5)*0.12,false,e.id,8+(level-1)*2,8);
+                    dispararBala(estado,e.x,e.y,toPA+(Math.random()-.5)*0.12,false,e.id,4+(level-1)*1,8);
                     e.shootTimer=1.8;
                 }
                 break;
@@ -647,7 +647,7 @@ function updateEnemigos(estado, dt) {
                 e.angle=toPA; e.retreatTimer-=DT;
                 e.shootTimer-=DT;
                 if (e.shootTimer<=0) {
-                    dispararBala(estado,e.x,e.y,toPA+(Math.random()-.5)*0.18,false,e.id,8+(level-1)*2,8);
+                    dispararBala(estado,e.x,e.y,toPA+(Math.random()-.5)*0.18,false,e.id,4+(level-1)*1,8);
                     e.shootTimer=1.0;
                 }
                 if (e.retreatTimer<=0) { e.estado=AI.STRAFE; e.aiTimer=1.0; e.strafeDir=Math.random()>.5?1:-1; }
@@ -656,7 +656,7 @@ function updateEnemigos(estado, dt) {
                 e.angle=toPA;
                 e.burstTimer-=DT;
                 if (e.burstTimer<=0&&e.burstCount>0) {
-                    dispararBala(estado,e.x,e.y,toPA+(Math.random()-.5)*0.10,false,e.id,8+(level-1)*2,8);
+                    dispararBala(estado,e.x,e.y,toPA+(Math.random()-.5)*0.10,false,e.id,4+(level-1)*1,8);
                     e.burstCount--; e.burstTimer=0.18;
                 }
                 { const dodge=Math.sin(estado.gameTime*8+parseInt(e.id.split('_')[1]||0))*spd*0.3;
@@ -671,7 +671,7 @@ function updateEnemigos(estado, dt) {
                   mx=Math.cos(toT)*spd*1.1; my=Math.sin(toT)*spd*1.1; }
                 e.shootTimer-=DT;
                 if (e.shootTimer<=0&&canSee) {
-                    dispararBala(estado,e.x,e.y,toPA+(Math.random()-.5)*0.15,false,e.id,8+(level-1)*2,8);
+                    dispararBala(estado,e.x,e.y,toPA+(Math.random()-.5)*0.15,false,e.id,4+(level-1)*1,8);
                     e.shootTimer=2.0;
                 }
                 break;
@@ -689,7 +689,7 @@ function updateEnemigos(estado, dt) {
                   e.angle=toPA; }
                 e.shootTimer-=DT;
                 if (e.shootTimer<=0&&canSee) {
-                    dispararBala(estado,e.x,e.y,toPA+(Math.random()-.5)*0.12,false,e.id,8+(level-1)*2,8);
+                    dispararBala(estado,e.x,e.y,toPA+(Math.random()-.5)*0.12,false,e.id,4+(level-1)*1,8);
                     e.shootTimer=1.5;
                 }
                 break;

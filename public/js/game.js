@@ -396,7 +396,7 @@ function loop(ts) {
     if (!mapa||!yo) { requestAnimationFrame(loop); return; }
 
     actualizarTexLava();
-    procesarInput(dt);
+    if (vivo) procesarInput(dt);  // no procesar input si estamos muertos
     actualizarBalas(dt);
     actualizarParticulas(dt);
     comprobarPickups();
@@ -1036,8 +1036,27 @@ function flashDanio(){
 function mostrarRespawn(seg){
     const ov=document.getElementById('respawnOverlay');
     const tm=document.getElementById('respawnTimer');
-    ov.style.display='flex';let t=seg;tm.textContent=t;
-    const iv=setInterval(()=>{t--;tm.textContent=Math.max(0,t);if(t<=0)clearInterval(iv);},1000);
+    ov.style.display='flex';
+    let t=seg; tm.textContent=t;
+    const iv=setInterval(()=>{
+        t--;
+        tm.textContent=Math.max(0,t);
+        if(t<=0){
+            clearInterval(iv);
+            // Si el servidor no mandó jugador_respawn todavía, no bloquear el juego
+            // El overlay se cierra al recibir jugador_respawn — esto es solo seguridad
+            setTimeout(()=>{
+                if(!vivo && yo){
+                    // Reubicar en última posición conocida y reactivar
+                    vivo=true;
+                    yo.hp=yo.maxHp||100;
+                    actualizarHP();
+                    ov.style.display='none';
+                    console.warn('Respawn forzado por timeout');
+                }
+            }, 2000);
+        }
+    },1000);
 }
 function mostrarResultado(resultados){
     const yo2=resultados.find(r=>r.id===miId||r.socketId===miId)||resultados[0];
