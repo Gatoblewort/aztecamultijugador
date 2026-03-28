@@ -210,13 +210,9 @@ function conectarSocket(token, salaId) {
     socket.on('jugador_movio', (snap) => {
         const { id, x, y, angle, arma, estado, z, skin, hp, vivo, ts } = snap;
 
-        // FIX BUG SYNC: ignorar nuestros propios snapshots (el servidor ahora
-        // usa io.to() que incluye al emisor — necesitamos filtrar aquí)
-        if (id === miId) {
-            // Solo reconciliar si hay desync grande (no sobreescribir posición local)
-            if (yo) PHYSICS.aplicarSnapshot(yo, snap, 300);
-            return;
-        }
+        // Ignorar completamente nuestros propios snapshots —
+        // el movimiento local ya es authoritative en el cliente
+        if (id === miId) return;
 
         // Crear entrada si no existe
         if (!jugadores[id]) {
