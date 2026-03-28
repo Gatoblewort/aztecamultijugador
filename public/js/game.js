@@ -56,8 +56,9 @@ let transicionando = false;
 
 // ── Physics (physics.js cargado antes en game.html) ──────────────────────
 // PHYSICS es global — accesible directamente
-let saltando       = false;   // true mientras el jugador está en el aire
-let interpBuffers  = {};      // buffers de interpolación por jugador id
+let saltando        = false;  // true mientras el jugador está en el aire
+let interpBuffers   = {};     // buffers de interpolación por jugador id
+let syncConfirmado  = false;  // true después de recibir sync_estado del servidor
 
 // ── Arranque ──────────────────────────────────────────────────────────────
 window.addEventListener('load', () => {
@@ -198,9 +199,6 @@ function tileToTex(t){const m={1:1,2:2,3:3,4:4,5:5,6:6,7:7};return m[t]||1;}
 
 // ── Socket ────────────────────────────────────────────────────────────────
 function conectarSocket(token, salaId) {
-    // FIX BUG SYNC: No enviar 'mover' hasta confirmar sync con el servidor
-    let syncConfirmado = false;
-
     socket = io({ auth:{ token, salaId, socketIdAnterior: miId } });
 
     socket.on('connect', () => {
