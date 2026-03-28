@@ -363,7 +363,7 @@ function updateBullets(estado, dt) {
                     if (!e.active) continue;
                     if (dist(b.x,b.y,e.x,e.y) < 64) {
                         e.hp -= b.danio;
-                        b.active = true; // se destruye debajo
+                        b.active = false; // FIX: destruir bala al impactar NPC
                         hit = true;
                         // Notificar daño al NPC
                         if (estado.onDanioNPC) estado.onDanioNPC(e.id, e.hp);

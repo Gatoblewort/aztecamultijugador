@@ -1044,24 +1044,34 @@ io.on('connection', (socket) => {
         if (salaId) {
             const sala = salas.get(salaId);
             if (sala) {
-                // NO borrar al jugador todavía — puede ser transición lobby→game.html
-                // Marcar como desconectado temporalmente
                 const jug = sala.jugadores.get(socket.id);
                 if (jug) jug._desconectando = true;
 
                 io.to(salaId).emit('jugador_salio', { id: socket.id });
 
-                // Grace period de 15s — si nadie reconecta, terminar partida
+                // Grace period de 15s
                 setTimeout(() => {
                     if (!salas.has(salaId)) return;
                     const salaActual = salas.get(salaId);
                     if (!salaActual) return;
 
-                    // Limpiar jugadores que siguen marcados como desconectando
                     for (const [sid, p] of salaActual.jugadores) {
                         if (p._desconectando) {
                             salaActual.jugadores.delete(sid);
-                            if (salaActual.engine) salaActual.engine.players.delete(sid);
+                            // FIX: marcar al jugador como no vivo en el engine
+                            // pero NO borrarlo del Map — así las balas siguen
+                            // pudiendo referenciarlo sin crash
+                            if (salaActual.engine) {
+                                const ep = salaActual.engine.players.get(sid);
+                                if (ep) {
+                                    ep.vivo = false;
+                                    // Borrarlo del engine después de un tick
+                                    setTimeout(() => {
+                                        if (salaActual.engine)
+                                            salaActual.engine.players.delete(sid);
+                                    }, 500);
+                                }
+                            }
                             console.log(`🗑️ Jugador ${p.nombre} removido tras grace period`);
                         }
                     }
@@ -1069,7 +1079,7 @@ io.on('connection', (socket) => {
                     if (salaActual.jugadores.size < 1) {
                         terminarPartida(salaId, 'abandono');
                     }
-                }, 15000); // 15 segundos de gracia
+                }, 15000);
             }
         }
     });
