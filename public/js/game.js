@@ -54,6 +54,11 @@ let lastMoveSent=0;
 let bossData   = null;
 let transicionando = false;
 
+// ── Physics (physics.js cargado antes en game.html) ──────────────────────
+// PHYSICS es global — accesible directamente
+let saltando       = false;   // true mientras el jugador está en el aire
+let interpBuffers  = {};      // buffers de interpolación por jugador id
+
 // ── Arranque ──────────────────────────────────────────────────────────────
 window.addEventListener('load', () => {
     const datos = JSON.parse(sessionStorage.getItem('aw_partida') || 'null');
@@ -193,63 +198,50 @@ function tileToTex(t){const m={1:1,2:2,3:3,4:4,5:5,6:6,7:7};return m[t]||1;}
 
 // ── Socket ────────────────────────────────────────────────────────────────
 function conectarSocket(token, salaId) {
-    socket = io({
-        auth: {
-            token,
-            salaId,
-            socketIdAnterior: miId   // el tuId que llegó en partida_iniciada
-        }
-    });
+    // FIX BUG SYNC: No enviar 'mover' hasta confirmar sync con el servidor
+    let syncConfirmado = false;
+
+    socket = io({ auth:{ token, salaId, socketIdAnterior: miId } });
 
     socket.on('connect', () => {
-        console.log('🟢 Socket conectado. Nuevo id:', socket.id, '| Anterior:', miId);
-        // Actualizar miId al nuevo socket id
-        if (jugadores[miId]) {
-            jugadores[socket.id] = jugadores[miId];
-            delete jugadores[miId];
-        }
-        miId = socket.id;
-        yo   = jugadores[miId];
-    });
-
-    // Otro jugador se reconectó con nuevo id — actualizar referencia local
-    socket.on('jugador_cambio_id', ({ idAnterior, idNuevo }) => {
-        if (jugadores[idAnterior]) {
-            jugadores[idNuevo] = jugadores[idAnterior];
-            delete jugadores[idAnterior];
-        }
-        console.log(`🔄 Jugador: ${idAnterior} → ${idNuevo}`);
+        console.log('🟢 Socket conectado, nuevo id:', socket.id);
+        socket.emit('reconectar_sala', { salaId, socketIdAnterior: miId });
     });
 
     // Movimiento de otros jugadores/NPCs
-    socket.on('jugador_movio', ({id, idAnterior, x, y, angle, arma, estado, skin, nombre}) => {
-        if (id === miId) return; // ignorar el nuestro
+    socket.on('jugador_movio', (snap) => {
+        const { id, x, y, angle, arma, estado, z, skin, hp, vivo, ts } = snap;
 
-        // Determinar qué id tenemos almacenado para este jugador
-        // Puede estar con id nuevo o con idAnterior
-        let claveReal = id;
-        if (!jugadores[id] && idAnterior && jugadores[idAnterior]) {
-            // Migrar al nuevo id
-            jugadores[id] = jugadores[idAnterior];
-            delete jugadores[idAnterior];
-            claveReal = id;
+        // FIX BUG SYNC: ignorar nuestros propios snapshots (el servidor ahora
+        // usa io.to() que incluye al emisor — necesitamos filtrar aquí)
+        if (id === miId) {
+            // Solo reconciliar si hay desync grande (no sobreescribir posición local)
+            if (yo) PHYSICS.aplicarSnapshot(yo, snap, 300);
+            return;
         }
 
-        if (!jugadores[claveReal]) {
-            jugadores[claveReal] = {
-                nombre: nombre || (id.startsWith('npc_') ? id.split('_')[2]||'NPC' : '?'),
+        // Crear entrada si no existe
+        if (!jugadores[id]) {
+            const esNPC = id.startsWith('e_') || id.startsWith('npc_');
+            jugadores[id] = {
+                nombre: esNPC ? (id.split('_')[2] || 'NPC') : id,
                 vivo: true, hp: 100, maxHp: 100,
-                esNPC: id.startsWith('npc_'),
-                skin: skin || 'conquistador'
+                esNPC, skin: skin || 'conquistador',
+                x, y, z: z || 0, angle: angle || 0,
             };
+            interpBuffers[id] = PHYSICS.crearBuffer();
         }
-        jugadores[claveReal].x     = x;
-        jugadores[claveReal].y     = y;
-        jugadores[claveReal].angle = angle;
-        jugadores[claveReal].arma  = arma;
-        if (skin)   jugadores[claveReal].skin   = skin;
-        if (nombre) jugadores[claveReal].nombre = nombre;
-        if (estado !== undefined) jugadores[claveReal].estado = estado;
+
+        // Guardar snapshot en buffer de interpolación
+        if (!interpBuffers[id]) interpBuffers[id] = PHYSICS.crearBuffer();
+        PHYSICS.pushSnapshot(interpBuffers[id], { x, y, z: z||0, angle, ts: ts || Date.now() });
+
+        // Aplicar inmediatamente (con suavizado)
+        PHYSICS.aplicarSnapshot(jugadores[id], snap, 256);
+        jugadores[id].arma = arma;
+        if (estado !== undefined) jugadores[id].estado = estado;
+        if (skin)  jugadores[id].skin = skin;
+        if (hp !== undefined) jugadores[id].hp = hp;
     });
 
     socket.on('npcs_spawned', npcs => {
@@ -347,6 +339,53 @@ function conectarSocket(token, salaId) {
 
     socket.on('chat_msg', ({nombre,msg}) => addChat(nombre,msg));
 
+    socket.on('sync_estado', ({ jugadores: jugs, tuId, npcs }) => {
+        // FIX BUG SYNC: guardar datos locales del jugador (posición, hp, etc.)
+        const datosLocales = jugadores[miId] || {};
+        const idAnterior   = miId;
+        miId = tuId;
+
+        for (const id in jugs) {
+            if (id === miId) {
+                // Mezclar: priorizar datos locales de posición, datos servidor para stats
+                jugadores[miId] = {
+                    ...jugs[id],
+                    x:     datosLocales.x     ?? jugs[id].x,
+                    y:     datosLocales.y     ?? jugs[id].y,
+                    angle: datosLocales.angle ?? jugs[id].angle,
+                    z:     datosLocales.z     || 0,
+                };
+                yo = jugadores[miId];
+            } else {
+                jugadores[id] = { ...jugs[id] };
+                interpBuffers[id] = PHYSICS.crearBuffer();
+            }
+        }
+
+        // Limpiar entrada con id anterior si cambió
+        if (idAnterior !== miId && jugadores[idAnterior]) {
+            delete jugadores[idAnterior];
+            delete interpBuffers[idAnterior];
+        }
+
+        if (npcs) for (const id in npcs) jugadores[id] = { ...npcs[id] };
+
+        // FIX BUG SYNC: ahora sí está seguro enviar movimiento
+        syncConfirmado = true;
+        console.log('🔄 Sync confirmado, miId:', miId);
+    });
+
+    socket.on('jugador_cambio_id', ({ idAnterior, idNuevo, jugador: jug }) => {
+        // Otro jugador se reconectó con nuevo socket id
+        if (jugadores[idAnterior]) {
+            jugadores[idNuevo] = { ...jugadores[idAnterior], ...jug };
+            delete jugadores[idAnterior];
+        } else {
+            jugadores[idNuevo] = { ...jug };
+        }
+        console.log(`🔄 Jugador cambió id: ${idAnterior} → ${idNuevo}`);
+    });
+
     socket.on('jugador_salio', ({id}) => { delete jugadores[id]; });
     socket.on('jugador_unido', jug => { jugadores[jug.id]=jug; });
 
@@ -414,22 +453,29 @@ function procesarInput(dt) {
     if (!colisiona(nx,yo.y,m)) yo.x=nx;
     if (!colisiona(yo.x,ny,m)) yo.y=ny;
 
-    if ((keys['Space']||keys['KeyF']||keys['ControlLeft'])&&vivo) disparar();
+    if (keys['ControlLeft'] && vivo) disparar();
 
-    if (Date.now()-lastMoveSent>50) {
-        socket.emit('mover',{x:yo.x,y:yo.y,angle:yo.angle});
-        lastMoveSent=Date.now();
+    // ── Salto ─────────────────────────────────────────────────────────────
+    if ((keys['Space'] || keys['KeyF']) && !saltando) {
+        if (PHYSICS.iniciarSalto(yo)) {
+            saltando = true;
+        }
+    }
+
+    // Tick física vertical
+    PHYSICS.tickSalto(yo, dt);
+    if (yo.onGround) saltando = false;
+
+    // FIX BUG SYNC: no enviar mover hasta confirmar sync con el servidor
+    if (syncConfirmado && Date.now() - lastMoveSent > 50) {
+        socket.emit('mover', { x: yo.x, y: yo.y, angle: yo.angle, z: yo.z || 0 });
+        lastMoveSent = Date.now();
     }
 }
 
-function colisiona(x,y,m) {
-    const tx1=Math.floor((x-m)/TILE),ty1=Math.floor((y-m)/TILE);
-    const tx2=Math.floor((x+m)/TILE),ty2=Math.floor((y+m)/TILE);
-    for (let ty=ty1;ty<=ty2;ty++) for (let tx=tx1;tx<=tx2;tx++) {
-        if (ty<0||ty>=mapa.alto||tx<0||tx>=mapa.ancho) return true;
-        if (mapa.tiles[ty][tx]!==0) return true;
-    }
-    return false;
+function colisiona(x, y, radio) {
+    // Usa PHYSICS para colisión consistente cliente/servidor
+    return PHYSICS.colisionAABB(mapa, x, y, radio || PHYSICS.PLAYER_RADIUS);
 }
 
 function disparar() {
