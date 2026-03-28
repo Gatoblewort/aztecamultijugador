@@ -257,15 +257,23 @@ function conectarSocket(token, salaId) {
     });
 
     socket.on('jugador_murio', ({id,matadoPor,kills,muertes}) => {
-        if (jugadores[id]) jugadores[id].vivo=false;
-        if (matadoPor===miId) {
-            yo.kills=kills;
-            setText('hudKills',kills);
-            addKillfeed(`⚔️ ${yo.nombre} eliminó a ${jugadores[id]?.nombre||id}`, true);
-        } else {
-            addKillfeed(`💀 ${jugadores[matadoPor]?.nombre||matadoPor} eliminó a ${jugadores[id]?.nombre||id}`);
+        // Marcar como muerto — NO eliminar del objeto, el render lo salta con !j.vivo
+        if (jugadores[id]) jugadores[id].vivo = false;
+
+        const esNPCmuerto   = id && (id.startsWith('e_') || id.startsWith('npc_'));
+        const nombreVictima = jugadores[id]?.nombre || (esNPCmuerto ? 'Conquistador' : id);
+        const nombreKiller  = jugadores[matadoPor]?.nombre || (matadoPor === 'boss' ? 'Hernán Cortés' : matadoPor);
+
+        if (matadoPor === miId) {
+            if (yo) { yo.kills = kills; setText('hudKills', kills); }
+            addKillfeed(`⚔️ ${yo?.nombre||'Tú'} eliminó a ${nombreVictima}`, true);
+        } else if (!esNPCmuerto) {
+            // Solo mostrar killfeed si murió un jugador real, no un NPC
+            addKillfeed(`💀 ${nombreKiller} eliminó a ${nombreVictima}`);
         }
-        if (id===miId) { vivo=false; mostrarRespawn(5); }
+
+        // Solo activar respawn si NOSOTROS morimos
+        if (id === miId) { vivo = false; mostrarRespawn(5); }
     });
 
     socket.on('jugador_respawn', ({id,x,y,hp}) => {
@@ -399,12 +407,12 @@ function loop(ts) {
     if (!mapa||!yo) { requestAnimationFrame(loop); return; }
 
     actualizarTexLava();
-    if (vivo) procesarInput(dt);  // no procesar input si estamos muertos
+    if (vivo) procesarInput(dt);
     actualizarBalas(dt);
     actualizarParticulas(dt);
     comprobarPickups();
-    render();
-    renderMinimap();
+    try { render(); } catch(e) { console.warn('render error:', e.message); }
+    try { renderMinimap(); } catch(e) { console.warn('minimap error:', e.message); }
     requestAnimationFrame(loop);
 }
 
@@ -650,11 +658,12 @@ function render() {
 function renderSprites() {
     const sprites=[];
     for (const id in jugadores) {
-        if (id===miId) continue;
-        const j=jugadores[id];
-        if (!j.vivo) continue;
-        const dx=j.x-yo.x,dy=j.y-yo.y;
-        sprites.push({type:'jugador',dist:Math.sqrt(dx*dx+dy*dy),j,dx,dy});
+        if (id === miId) continue;
+        const j = jugadores[id];
+        // Guard: saltar si muerto, sin posición, o sin yo válido
+        if (!j || !j.vivo || j.x === undefined || j.y === undefined) continue;
+        const dx = j.x - yo.x, dy = j.y - yo.y;
+        sprites.push({type:'jugador', dist: Math.sqrt(dx*dx+dy*dy), j, dx, dy});
     }
     for (const id in monedas) {
         const m=monedas[id];
