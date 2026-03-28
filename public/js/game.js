@@ -208,7 +208,9 @@ function conectarSocket(token, salaId) {
 
     // Movimiento de otros jugadores/NPCs
     socket.on('jugador_movio', (snap) => {
-        const { id, x, y, angle, arma, estado, z, skin, hp, vivo, ts } = snap;
+        // Renombrar vivo→snapVivo para NO hacer shadow de la variable global vivo
+        const { id, x, y, angle, arma, estado, z, skin, hp, ts } = snap;
+        const snapVivo = snap.vivo;
 
         // Ignorar completamente nuestros propios snapshots —
         // el movimiento local ya es authoritative en el cliente
@@ -232,7 +234,8 @@ function conectarSocket(token, salaId) {
 
         // Aplicar inmediatamente (con suavizado)
         PHYSICS.aplicarSnapshot(jugadores[id], snap, 256);
-        jugadores[id].arma = arma;
+        jugadores[id].arma   = arma;
+        jugadores[id].vivo   = snapVivo !== false; // usar snapVivo, no la global
         if (estado !== undefined) jugadores[id].estado = estado;
         if (skin)  jugadores[id].skin = skin;
         if (hp !== undefined) jugadores[id].hp = hp;
