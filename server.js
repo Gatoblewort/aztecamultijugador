@@ -839,18 +839,17 @@ io.on('connection', (socket) => {
         // Broadcast bala a todos en la sala
         io.to(salaId).emit('bala_creada', bala);
 
-        // Detección de hit — simular trayectoria de la bala paso a paso
-        const HIT_RADIO = 50;
+        // Detección de hit — simular trayectoria paso a paso con radio generoso
+        // Radio ampliado a 64px para compensar latencia de red
+        const HIT_RADIO = 64;
         let balaX = data.x, balaY = data.y;
-        // Normalizar dirección y usar pasos más pequeños para mayor precisión
         const bSpeed = Math.sqrt(data.dx*data.dx + data.dy*data.dy) || 1;
-        const bStepX = (data.dx / bSpeed) * 8;
-        const bStepY = (data.dy / bSpeed) * 8;
+        const bStepX = (data.dx / bSpeed) * 6;   // pasos más pequeños = más precisión
+        const bStepY = (data.dy / bSpeed) * 6;
         let hitRegistrado = false;
 
-        for (let paso = 0; paso < 150 && !hitRegistrado; paso++) {
+        for (let paso = 0; paso < 200 && !hitRegistrado; paso++) {
             balaX += bStepX; balaY += bStepY;
-            // Colision con pared
             const btx = Math.floor(balaX/64), bty = Math.floor(balaY/64);
             if (bty < 0 || bty >= sala.mapa.alto || btx < 0 || btx >= sala.mapa.ancho) break;
             if (sala.mapa.tiles[bty][btx] !== 0) break;

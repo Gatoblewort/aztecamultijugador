@@ -353,11 +353,12 @@ function procesarInput(dt) {
     if (keys['ArrowLeft'])  yo.angle -= TURN_SPD;
     if (keys['ArrowRight']) yo.angle += TURN_SPD;
 
-    // Joystick
+    // Joystick — velocidad completa igual que teclado
     if (joystick.active) {
-        nx += Math.cos(yo.angle)*joystick.y*spd*.06 + Math.cos(yo.angle+HALF_PI)*joystick.x*spd*.06;
-        ny += Math.sin(yo.angle)*joystick.y*spd*.06 + Math.sin(yo.angle+HALF_PI)*joystick.x*spd*.06;
-        yo.angle += joystick.rx * 0.04;
+        // joystick.y va de -1 (adelante) a +1 (atrás), joystick.x de -1 a +1 (strafe)
+        nx += Math.cos(yo.angle)*(-joystick.y)*spd + Math.cos(yo.angle+HALF_PI)*joystick.x*spd;
+        ny += Math.sin(yo.angle)*(-joystick.y)*spd + Math.sin(yo.angle+HALF_PI)*joystick.x*spd;
+        yo.angle += joystick.rx * 0.06;
     }
 
     const m=16;
@@ -963,60 +964,125 @@ function renderMinimap() {
 
 // ── JOYSTICK MÓVIL ────────────────────────────────────────────────────────
 const joystick={active:false,x:0,y:0,rx:0,baseX:0,baseY:0,id:-1};
+
 function initJoystick() {
-    const isMobile=('ontouchstart' in window);
-    if(!isMobile){
+    const isMobile = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+    if (!isMobile) {
         document.getElementById('joystickWrap').style.display='none';
         document.getElementById('btnDisparar').style.display='none';
         document.getElementById('btnCambiarArma').style.display='none';
         return;
     }
-    const wrap=document.getElementById('joystickWrap');
-    const thumb=document.getElementById('joystickThumb');
-    const maxR=40;
 
-    wrap.addEventListener('touchstart',e=>{
-        e.preventDefault();
-        const t=e.changedTouches[0];
-        joystick.id=t.identifier; joystick.active=true;
-        joystick.baseX=t.clientX; joystick.baseY=t.clientY;
-    },{passive:false});
-    wrap.addEventListener('touchmove',e=>{
-        e.preventDefault();
-        for(const t of e.changedTouches) {
-            if(t.identifier!==joystick.id) continue;
-            const dx=t.clientX-joystick.baseX, dy=t.clientY-joystick.baseY;
-            const d=Math.sqrt(dx*dx+dy*dy);
-            const cx=dx/Math.max(d,1)*Math.min(d,maxR);
-            const cy=dy/Math.max(d,1)*Math.min(d,maxR);
-            joystick.x=cx/maxR; joystick.y=cy/maxR;
-            thumb.style.transform=`translate(${cx}px,${cy}px)`;
-        }
-    },{passive:false});
-    const endJ=()=>{joystick.active=false;joystick.x=0;joystick.y=0;
-        thumb.style.transform='';};
-    wrap.addEventListener('touchend',endJ);
-    wrap.addEventListener('touchcancel',endJ);
+    const wrap  = document.getElementById('joystickWrap');
+    const thumb = document.getElementById('joystickThumb');
+    const maxR  = 45;
 
-    // Deslizar pantalla derecha para mirar
-    let lookId=-1,lookStartX=0;
-    canvas.addEventListener('touchstart',e=>{
-        for(const t of e.changedTouches){
-            if(t.clientX>W*.5&&lookId===-1){lookId=t.identifier;lookStartX=t.clientX;}
-        }
-    });
-    canvas.addEventListener('touchmove',e=>{
+    // ── Joystick izquierdo ──────────────────────────────────────────────
+    wrap.addEventListener('touchstart', e => {
         e.preventDefault();
-        for(const t of e.changedTouches){
-            if(t.identifier===lookId&&vivo){
-                joystick.rx=(t.clientX-lookStartX)*.01;
-                lookStartX=t.clientX;
+        const t = e.changedTouches[0];
+        joystick.id    = t.identifier;
+        joystick.active = true;
+        joystick.baseX = t.clientX;
+        joystick.baseY = t.clientY;
+    }, { passive: false });
+
+    wrap.addEventListener('touchmove', e => {
+        e.preventDefault();
+        for (const t of e.changedTouches) {
+            if (t.identifier !== joystick.id) continue;
+            const dx = t.clientX - joystick.baseX;
+            const dy = t.clientY - joystick.baseY;
+            const d  = Math.sqrt(dx*dx + dy*dy);
+            const cx = dx / Math.max(d, 1) * Math.min(d, maxR);
+            const cy = dy / Math.max(d, 1) * Math.min(d, maxR);
+            joystick.x = cx / maxR;
+            joystick.y = cy / maxR;
+            thumb.style.transform = `translate(${cx}px,${cy}px)`;
+        }
+    }, { passive: false });
+
+    const resetJoystick = () => {
+        joystick.active = false;
+        joystick.x = 0;
+        joystick.y = 0;
+        thumb.style.transform = '';
+    };
+    wrap.addEventListener('touchend',    resetJoystick);
+    wrap.addEventListener('touchcancel', resetJoystick);
+
+    // ── Botón DISPARAR — pointer events para no interferir con canvas ───
+    const btnD = document.getElementById('btnDisparar');
+    btnD.addEventListener('touchstart', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        disparar();
+    }, { passive: false });
+    // Disparo continuo mientras se mantiene presionado
+    let fireInterval = null;
+    btnD.addEventListener('touchstart', e => {
+        e.preventDefault();
+        if (fireInterval) clearInterval(fireInterval);
+        fireInterval = setInterval(() => disparar(), 120);
+    }, { passive: false });
+    btnD.addEventListener('touchend', e => {
+        e.preventDefault();
+        if (fireInterval) { clearInterval(fireInterval); fireInterval = null; }
+    }, { passive: false });
+    btnD.addEventListener('touchcancel', e => {
+        if (fireInterval) { clearInterval(fireInterval); fireInterval = null; }
+    }, { passive: false });
+
+    // ── Botón CAMBIAR ARMA ──────────────────────────────────────────────
+    const btnA = document.getElementById('btnCambiarArma');
+    btnA.addEventListener('touchstart', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        cambiarArma();
+    }, { passive: false });
+
+    // ── Zona derecha del canvas: deslizar para girar cámara ────────────
+    // Usamos document para capturar todos los touches que no sean botones/joystick
+    let lookId = -1, lookStartX = 0, lookStartY = 0;
+
+    document.addEventListener('touchstart', e => {
+        for (const t of e.changedTouches) {
+            // Ignorar si el touch pertenece al joystick, botón disparar o cambiar arma
+            const el = document.elementFromPoint(t.clientX, t.clientY);
+            if (el && (el.id === 'joystickWrap' || el.id === 'joystickBase' ||
+                       el.id === 'joystickThumb' || el.id === 'btnDisparar' ||
+                       el.id === 'btnCambiarArma')) continue;
+            // Solo la mitad derecha activa la cámara
+            if (t.clientX > W * 0.45 && lookId === -1) {
+                lookId     = t.identifier;
+                lookStartX = t.clientX;
+                lookStartY = t.clientY;
             }
         }
-    },{passive:false});
-    canvas.addEventListener('touchend',e=>{
-        for(const t of e.changedTouches) if(t.identifier===lookId){lookId=-1;joystick.rx=0;}
-    });
+    }, { passive: true });
+
+    document.addEventListener('touchmove', e => {
+        for (const t of e.changedTouches) {
+            if (t.identifier !== lookId) continue;
+            const dx = t.clientX - lookStartX;
+            joystick.rx = dx * 0.012; // sensibilidad de giro
+            lookStartX  = t.clientX;
+            lookStartY  = t.clientY;
+        }
+    }, { passive: true });
+
+    document.addEventListener('touchend', e => {
+        for (const t of e.changedTouches) {
+            if (t.identifier === lookId) { lookId = -1; joystick.rx = 0; }
+        }
+    }, { passive: true });
+
+    document.addEventListener('touchcancel', e => {
+        for (const t of e.changedTouches) {
+            if (t.identifier === lookId) { lookId = -1; joystick.rx = 0; }
+        }
+    }, { passive: true });
 }
 
 // ── CHAT ─────────────────────────────────────────────────────────────────
