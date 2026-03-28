@@ -361,7 +361,7 @@ function procesarInput(dt) {
     if (joystick.active) {
         nx+=Math.cos(yo.angle)*(-joystick.y)*spd + Math.cos(yo.angle+HALF_PI)*joystick.x*spd;
         ny+=Math.sin(yo.angle)*(-joystick.y)*spd + Math.sin(yo.angle+HALF_PI)*joystick.x*spd;
-        yo.angle+=joystick.rx*0.06;
+        // joystick.rx ya no se usa — el giro se aplica directo en lookZone.touchmove
     }
 
     const m=PLAYER_SPD*0.8;
@@ -899,22 +899,39 @@ function initJoystick(){
     const btnA=document.getElementById('btnCambiarArma');
     btnA.addEventListener('touchstart',e=>{e.preventDefault();e.stopPropagation();cambiarArma();},{passive:false});
 
-    let lookId=-1,lookStartX=0;
-    document.addEventListener('touchstart',e=>{
-        for(const t of e.changedTouches){
-            const el=document.elementFromPoint(t.clientX,t.clientY);
-            if(el&&['joystickWrap','joystickBase','joystickThumb','btnDisparar','btnCambiarArma'].includes(el.id))continue;
-            if(t.clientX>W*.45&&lookId===-1){lookId=t.identifier;lookStartX=t.clientX;}
+    // ── Zona de cámara — div en HTML mitad derecha ────────────────────────
+    // El div#lookZone ya existe en el HTML con z-index:18, encima del canvas
+    // En Android el canvas tiene pointer-events:none así que los touches
+    // llegan directamente al lookZone sin interferencia
+    const lookZone = document.getElementById('lookZone');
+
+    let lookId = -1, lookLastX = 0;
+
+    lookZone.addEventListener('touchstart', e => {
+        e.preventDefault();
+        if (lookId !== -1) return;
+        const t = e.changedTouches[0];
+        lookId    = t.identifier;
+        lookLastX = t.clientX;
+    }, { passive: false });
+
+    lookZone.addEventListener('touchmove', e => {
+        e.preventDefault();
+        for (const t of e.changedTouches) {
+            if (t.identifier !== lookId) continue;
+            const dx = t.clientX - lookLastX;
+            if (yo && vivo) yo.angle += dx * 0.008;
+            lookLastX = t.clientX;
         }
-    },{passive:true});
-    document.addEventListener('touchmove',e=>{
-        for(const t of e.changedTouches){if(t.identifier!==lookId)continue;
-            joystick.rx=(t.clientX-lookStartX)*.012;lookStartX=t.clientX;
+    }, { passive: false });
+
+    const endLook = e => {
+        for (const t of e.changedTouches) {
+            if (t.identifier === lookId) { lookId = -1; joystick.rx = 0; }
         }
-    },{passive:true});
-    document.addEventListener('touchend',e=>{
-        for(const t of e.changedTouches)if(t.identifier===lookId){lookId=-1;joystick.rx=0;}
-    },{passive:true});
+    };
+    lookZone.addEventListener('touchend',    endLook, { passive: false });
+    lookZone.addEventListener('touchcancel', endLook, { passive: false });
 }
 
 // ── HUD helpers ───────────────────────────────────────────────────────────
