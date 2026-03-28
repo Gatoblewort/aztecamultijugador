@@ -503,16 +503,23 @@ function cambiarArma() {
 
 // ── Balas (cliente — visual solamente) ───────────────────────────────────
 function actualizarBalas(dt) {
+    const aBorrar = [];
     for (const id in balas) {
-        const b=balas[id];
-        b.x+=b.dx; b.y+=b.dy;
-        b.localLife-=dt;
-        const tx=Math.floor(b.x/TILE),ty=Math.floor(b.y/TILE);
-        if (b.localLife<=0||ty<0||ty>=mapa.alto||tx<0||tx>=mapa.ancho||mapa.tiles[ty][tx]!==0) {
-            spawnParticula(b.x,b.y,200,200,100,4);
-            delete balas[id];
+        const b = balas[id];
+        // Guard: bala inválida o sin posición
+        if (!b || b.x === undefined || b.dx === undefined) { aBorrar.push(id); continue; }
+        b.x += b.dx; b.y += b.dy;
+        b.localLife -= dt;
+        const tx = Math.floor(b.x / TILE), ty = Math.floor(b.y / TILE);
+        const fueraDelMapa = ty < 0 || ty >= mapa.alto || tx < 0 || tx >= mapa.ancho;
+        const golpePared   = !fueraDelMapa && mapa.tiles[ty][tx] !== 0;
+        if (b.localLife <= 0 || fueraDelMapa || golpePared) {
+            if (!fueraDelMapa) spawnParticula(b.x, b.y, 200, 200, 100, 4);
+            aBorrar.push(id);
         }
     }
+    // Borrar fuera del loop para no romper la iteración
+    for (const id of aBorrar) delete balas[id];
 }
 
 // ── Pickups (colección visual en cliente) ─────────────────────────────────
@@ -690,20 +697,24 @@ function renderSprites() {
         if (Math.abs(a)>FOV/1.8) continue;
 
         const scx=(a/FOV+.5)*W;
-        const sh=(TILE/sp.dist)*600,sw=sh;
+        // Guard: evitar división por cero y sprites gigantes cuando dist es muy pequeña
+        const safeDist = Math.max(sp.dist, 8);
+        const sh=Math.min((TILE/safeDist)*600, H*3), sw=sh;
         const groundLine=H/2+sh*.5,drawY=groundLine-sh;
 
         if (sp.type==='jugador') {
-            const iw=Math.max(1,Math.floor(sw)),ih=Math.max(1,Math.floor(sh));
+            const iw=Math.max(1,Math.min(Math.floor(sw), W)),ih=Math.max(1,Math.min(Math.floor(sh), H*2));
             const drawX=Math.floor(scx-sw/2);
             let vis=false;
-            for (let c=0;c<iw;c++){const sc=drawX+c;if(sc>=0&&sc<W&&sp.dist<zBuffer[sc]){vis=true;break;}}
+            for (let c=0;c<iw;c++){const sc=drawX+c;if(sc>=0&&sc<W&&safeDist<zBuffer[sc]){vis=true;break;}}
             if (!vis) continue;
 
-            const bright=Math.max(.3,1-sp.dist/600);
+            const bright=Math.max(.3,1-safeDist/600);
             // Usar skins.js para dibujar el personaje
             ctx.save();
-            dibujarSkin(ctx, sp.j.skin||'guerrero_base', drawX, Math.floor(drawY), iw, ih, gameTime, bright, {aiEstado:sp.j.estado});
+            try {
+                dibujarSkin(ctx, sp.j.skin||'guerrero_base', drawX, Math.floor(drawY), iw, ih, gameTime, bright, {aiEstado:sp.j.estado});
+            } catch(e) { console.warn('skin draw error:', e.message); }
             ctx.restore();
 
             // Nombre + barra HP
@@ -874,6 +885,7 @@ function renderArma() {
 function renderBalas() {
     for (const id in balas) {
         const b=balas[id];
+        if (!b || b.x===undefined || isNaN(b.x) || isNaN(b.y)) continue;
         const dx=b.x-yo.x,dy=b.y-yo.y;
         const d=Math.sqrt(dx*dx+dy*dy);if(d>500||d<5)continue;
         const angle=Math.atan2(dy,dx)-yo.angle;
