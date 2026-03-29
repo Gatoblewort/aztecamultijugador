@@ -1,14 +1,25 @@
 {
-  "name": "Aztec War",
-  "short_name": "AztecWar",
-  "description": "Batalla multijugador por el Quinto Sol",
+  "name": "Guerreros de Tenochtitlan",
+  "short_name": "GdeT",
+  "description": "Juego FPS multijugador azteca — Batalla por el Quinto Sol",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#0a0a14",
   "theme_color": "#7c3aed",
-  "orientation": "landscape-primary",
+  "orientation": "any",
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }
