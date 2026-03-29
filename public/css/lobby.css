@@ -20,15 +20,32 @@
 body { background:var(--bg); color:var(--text); min-height:100vh; overflow-x:hidden; }
 
 /* ── PANTALLAS ──────────────────────────────────────────────────────── */
-.screen { display:none; }
-.screen.active { display:block; }
+/* ── SCREENS: position fixed para separación perfecta en desktop y móvil */
+.screen {
+    display: none;
+    position: fixed;
+    inset: 0;          /* top:0 right:0 bottom:0 left:0 */
+    width: 100%;
+    height: 100%;
+    overflow-y: auto;
+    z-index: 1;
+}
+.screen.active {
+    display: block;
+    z-index: 10;
+}
 
 /* ── AUTH ────────────────────────────────────────────────────────────── */
 #authScreen {
-    min-height:100vh; display:flex; align-items:center; justify-content:center;
+    display: none;
+    align-items: center;
+    justify-content: center;
     background: radial-gradient(ellipse at center, #1a0533 0%, #0a0a14 70%);
 }
-#authScreen.active { display:flex; }
+#authScreen.active {
+    display: flex;
+    z-index: 20; /* encima del appScreen siempre */
+}
 
 .auth-box {
     background:var(--card); border:1px solid var(--border);
@@ -80,7 +97,12 @@ body { background:var(--bg); color:var(--text); min-height:100vh; overflow-x:hid
 .error-msg { color:#ff5555; font-size:12px; margin-top:8px; text-align:center; min-height:18px; }
 
 /* ── APP LAYOUT ──────────────────────────────────────────────────────── */
-#appScreen.active { display:flex; min-height:100vh; }
+#appScreen.active {
+    display: flex;
+    min-height: 100vh;
+    height: auto;        /* permite scroll si el contenido es largo */
+    overflow-y: auto;
+}
 
 .sidebar {
     width:220px; background:var(--sidebar); border-right:1px solid var(--border);

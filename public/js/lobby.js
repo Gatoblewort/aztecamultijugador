@@ -42,6 +42,7 @@ async function login() {
         mostrarApp();
         conectarSocket();
         showToast(`¡Que comience la batalla, ${jugador.nombre}! ⚔️`);
+        // Fix desktop: forzar repaint para que el navegador aplique los cambios de clase
         document.getElementById('appScreen').offsetHeight;
     } catch { setError('Error de conexión'); }
 }
@@ -73,7 +74,7 @@ function logout() {
     token = null; jugador = null; buscando = false;
     document.querySelectorAll('.screen').forEach(s => {
         s.classList.remove('active');
-        s.style.display = '';
+        s.style.display = ''; // limpiar inline styles
     });
     document.getElementById('authScreen').classList.add('active');
 }
@@ -82,9 +83,11 @@ function logout() {
 function mostrarApp() {
     document.querySelectorAll('.screen').forEach(s => {
         s.classList.remove('active');
-        s.style.display = '';
+        s.style.cssText = '';
     });
-    document.getElementById('appScreen').classList.add('active');
+    const app = document.getElementById('appScreen');
+    app.classList.add('active');
+    void app.offsetWidth;
     actualizarUI();
     cargarPerfil();
     cargarRanking('puntos', document.querySelector('.rtab'));
