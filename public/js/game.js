@@ -350,14 +350,19 @@ function conectarSocket(token, salaId) {
     socket.on('chat_msg', ({nombre,msg}) => addChat(nombre,msg));
 
     socket.on('sync_estado', ({ jugadores: jugs, tuId, npcs }) => {
-        // FIX BUG SYNC: guardar datos locales del jugador (posición, hp, etc.)
         const datosLocales = jugadores[miId] || {};
         const idAnterior   = miId;
         miId = tuId;
 
+        // Guardar NPCs existentes antes de tocar jugadores
+        const npcsExistentes = {};
+        for (const id in jugadores) {
+            if (jugadores[id].esNPC) npcsExistentes[id] = jugadores[id];
+        }
+
+        // Actualizar solo jugadores humanos
         for (const id in jugs) {
             if (id === miId) {
-                // Mezclar: priorizar datos locales de posición, datos servidor para stats
                 jugadores[miId] = {
                     ...jugs[id],
                     x:     datosLocales.x     ?? jugs[id].x,
@@ -366,23 +371,28 @@ function conectarSocket(token, salaId) {
                     z:     datosLocales.z     || 0,
                 };
                 yo = jugadores[miId];
-            } else {
+            } else if (!jugs[id].esNPC) {
                 jugadores[id] = { ...jugs[id] };
                 interpBuffers[id] = PHYSICS.crearBuffer();
             }
         }
 
-        // Limpiar entrada con id anterior si cambió
+        // Limpiar id anterior si cambió
         if (idAnterior !== miId && jugadores[idAnterior]) {
             delete jugadores[idAnterior];
             delete interpBuffers[idAnterior];
         }
 
-        if (npcs) for (const id in npcs) jugadores[id] = { ...npcs[id] };
+        // Restaurar NPCs existentes + agregar los nuevos del servidor
+        for (const id in npcsExistentes) jugadores[id] = npcsExistentes[id];
+        if (npcs) {
+            for (const id in npcs) {
+                if (!jugadores[id]) jugadores[id] = { ...npcs[id] };
+            }
+        }
 
-        // FIX BUG SYNC: ahora sí está seguro enviar movimiento
         syncConfirmado = true;
-        console.log('🔄 Sync confirmado, miId:', miId);
+        console.log('🔄 Sync confirmado, miId:', miId, '| NPCs:', Object.keys(jugadores).filter(k => jugadores[k].esNPC).length);
     });
 
     socket.on('jugador_cambio_id', ({ idAnterior, idNuevo, jugador: jug }) => {
