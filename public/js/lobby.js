@@ -325,11 +325,11 @@ function conectarSocket() {
         buscando = false;
         document.getElementById('btnJugar').disabled = false;
         document.getElementById('colaStatus').style.display = 'none';
+        // Guardar datos de la partida y abrir el juego
         sessionStorage.setItem('aw_partida', JSON.stringify(datos));
         sessionStorage.setItem('aw_socket_id', socket.id);
         showToast('⚔️ ¡Partida encontrada! Entrando al campo de batalla...');
-        // Usar replace para que al volver del juego, no regrese al mid-redirect
-        setTimeout(() => { window.location.replace('/game.html'); }, 1200);
+        setTimeout(() => { window.location.href = '/game.html'; }, 1200);
     });
 
     socket.on('disconnect', () => console.log('🔴 Socket desconectado'));
