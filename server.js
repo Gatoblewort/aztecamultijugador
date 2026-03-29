@@ -35,6 +35,17 @@ initDB();
 
 // ─── MIDDLEWARE ─────────────────────────────────────────────────────────────
 app.use(express.json());
+
+// Evitar que el navegador cachee JS y HTML — fix para login sin Ctrl+Shift+R
+app.use((req, res, next) => {
+    if (req.path.endsWith('.js') || req.path.endsWith('.html') || req.path === '/') {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+    }
+    next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── RUTAS API ───────────────────────────────────────────────────────────────
@@ -912,19 +923,10 @@ io.on('connection', (socket) => {
         // Enviar estado actual de todos los jugadores al reconectado
         const jugadoresObj = {};
         for (const [sid, p] of sala.jugadores) jugadoresObj[sid] = { ...p };
-
-        // FIX: mandar enemies del engine (no sala.npcs que siempre está vacío)
-        const npcsObj = {};
-        if (sala.engine && sala.engine.enemies) {
-            for (const e of sala.engine.enemies) {
-                if (e.active) npcsObj[e.id] = { ...e, esNPC: true, skin: 'conquistador', nombre: e.id };
-            }
-        }
-
         socket.emit('sync_estado', {
             jugadores: jugadoresObj,
             tuId: socket.id,
-            npcs: npcsObj
+            npcs: sala.npcs || {}
         });
 
         // Avisar a los demás que este jugador tiene nuevo id
