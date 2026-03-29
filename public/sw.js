@@ -1,13 +1,30 @@
-const CACHE='aztec-war-v1';
-const ASSETS=['/','index.html','/css/lobby.css','/js/lobby.js'];
-self.addEventListener('install',e=>{
-    e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).catch(()=>{}));
+const CACHE = 'gdt-v2';
+const ASSETS = ['/', '/index.html', '/css/lobby.css', '/manifest.json'];
+
+self.addEventListener('install', e => {
+    e.waitUntil(
+        caches.open(CACHE).then(c => c.addAll(ASSETS)).catch(() => {})
+    );
+    self.skipWaiting();
 });
-self.addEventListener('fetch',e=>{
-    // No cachear el juego ni las APIs
-    if(e.request.url.includes('/game')||e.request.url.includes('/api')||
-       e.request.url.includes('/socket.io')) return;
+
+self.addEventListener('activate', e => {
+    // Borrar caches viejos
+    e.waitUntil(
+        caches.keys().then(keys =>
+            Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+        )
+    );
+    self.clients.claim();
+});
+
+self.addEventListener('fetch', e => {
+    // NUNCA cachear JS, API ni socket.io — siempre red
+    const url = e.request.url;
+    if (url.includes('/js/') || url.includes('/api') ||
+        url.includes('/socket.io') || url.includes('/game')) return;
+
     e.respondWith(
-        caches.match(e.request).then(r=>r||fetch(e.request))
+        caches.match(e.request).then(r => r || fetch(e.request))
     );
 });
