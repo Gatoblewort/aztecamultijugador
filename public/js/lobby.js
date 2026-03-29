@@ -9,10 +9,42 @@ let todasSkins = [];
 // ── ARRANQUE ────────────────────────────────────────────────────────────
 window.onload = () => {
     if (token && jugador) {
-        mostrarApp();
-        conectarSocket();
+        // Mostrar pantalla de acceso rápido — no auto-entrar
+        mostrarAccesoRapido();
     }
 };
+
+// Pantalla de acceso rápido cuando hay sesión guardada
+function mostrarAccesoRapido() {
+    const ini = jugador.nombre?.[0]?.toUpperCase() || '?';
+    const box = document.getElementById('accesoRapidoBox');
+    if (box) {
+        document.getElementById('arNombre').textContent = jugador.nombre;
+        document.getElementById('arAvatar').textContent = ini;
+        document.getElementById('arNivel').textContent  = `Nivel ${jugador.nivel || 1}`;
+        const btn = document.getElementById('arNombreBtn');
+        if (btn) btn.textContent = jugador.nombre.toUpperCase();
+        box.style.display = 'block';
+        document.getElementById('loginForm').style.display    = 'none';
+        document.getElementById('registerForm').style.display = 'none';
+        document.querySelectorAll('.auth-tabs').forEach(t => t.style.display = 'none');
+    }
+}
+
+function continuarSesion() {
+    mostrarApp();
+    conectarSocket();
+}
+
+function cerrarSesionRapida() {
+    token = null; jugador = null;
+    localStorage.removeItem('aw_token');
+    localStorage.removeItem('aw_jugador');
+    const box = document.getElementById('accesoRapidoBox');
+    if (box) box.style.display = 'none';
+    document.querySelectorAll('.auth-tabs').forEach(t => t.style.display = 'flex');
+    document.getElementById('loginForm').style.display = 'block';
+}
 
 // ── AUTH TABS ────────────────────────────────────────────────────────────
 function setAuthTab(tab, btn) {
