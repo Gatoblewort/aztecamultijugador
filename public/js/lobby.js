@@ -39,11 +39,14 @@ async function login() {
         jugador = data.jugador;
         localStorage.setItem('aw_token',   token);
         localStorage.setItem('aw_jugador', JSON.stringify(jugador));
+        // Mostrar app primero, dejar que el browser pinte, LUEGO conectar socket
         mostrarApp();
-        conectarSocket();
-        showToast(`¡Que comience la batalla, ${jugador.nombre}! ⚔️`);
-        // Fix desktop: forzar repaint para que el navegador aplique los cambios de clase
-        document.getElementById('appScreen').offsetHeight;
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                conectarSocket();
+                showToast(`¡Que comience la batalla, ${jugador.nombre}! ⚔️`);
+            });
+        });
     } catch { setError('Error de conexión'); }
 }
 
@@ -72,22 +75,30 @@ function logout() {
     localStorage.removeItem('aw_token');
     localStorage.removeItem('aw_jugador');
     token = null; jugador = null; buscando = false;
-    document.querySelectorAll('.screen').forEach(s => {
-        s.classList.remove('active');
-        s.style.display = ''; // limpiar inline styles
-    });
-    document.getElementById('authScreen').classList.add('active');
+    const appS = document.getElementById('appScreen');
+    appS.classList.remove('active');
+    appS.style.cssText = 'display:none !important';
+    const authS = document.getElementById('authScreen');
+    authS.style.cssText = '';
+    authS.classList.add('active');
 }
 
 // ── MOSTRAR APP ───────────────────────────────────────────────────────────
 function mostrarApp() {
-    document.querySelectorAll('.screen').forEach(s => {
-        s.classList.remove('active');
-        s.style.cssText = '';
-    });
+    // Ocultar auth completamente
+    const auth = document.getElementById('authScreen');
+    auth.classList.remove('active');
+    auth.style.cssText = 'display:none !important';
+
+    // Mostrar app
     const app = document.getElementById('appScreen');
+    app.style.cssText = '';
     app.classList.add('active');
-    void app.offsetWidth;
+
+    // Scroll al inicio
+    window.scrollTo(0, 0);
+    app.scrollTop = 0;
+
     actualizarUI();
     cargarPerfil();
     cargarRanking('puntos', document.querySelector('.rtab'));
