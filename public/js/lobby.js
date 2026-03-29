@@ -39,7 +39,9 @@ async function login() {
         jugador = data.jugador;
         localStorage.setItem('aw_token',   token);
         localStorage.setItem('aw_jugador', JSON.stringify(jugador));
-        window.location.reload();
+        mostrarApp();
+        conectarSocket();
+        showToast(`¡Que comience la batalla, ${jugador.nombre}! ⚔️`);
     } catch { setError('Error de conexión'); }
 }
 
@@ -68,14 +70,16 @@ function logout() {
     localStorage.removeItem('aw_token');
     localStorage.removeItem('aw_jugador');
     token = null; jugador = null; buscando = false;
-    document.getElementById('appScreen').style.display = 'none';
-    document.getElementById('authScreen').style.display = 'flex';
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('authScreen').classList.add('active');
 }
 
 // ── MOSTRAR APP ───────────────────────────────────────────────────────────
 function mostrarApp() {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('appScreen').classList.add('active');
+    // Ocultar panel de auth que quedaba visible
     document.getElementById('authScreen').style.display = 'none';
-    document.getElementById('appScreen').style.display = 'flex';
     actualizarUI();
     cargarPerfil();
     cargarRanking('puntos', document.querySelector('.rtab'));
@@ -184,7 +188,7 @@ function renderSkins() {
             <div class="skin-preview">${emoji}</div>
             <div class="skin-name">${skin.nombre}</div>
             <div class="skin-desc">${skin.descripcion}</div>
-            ${!tengo ? `<div class="skin-cost">monedas ${skin.costo_monedas} monedas</div>
+            ${!tengo ? `<div class="skin-cost">🪙 ${skin.costo_monedas} monedas</div>
                         <div class="skin-nivel">Nivel ${skin.nivel_requerido} requerido</div>` :
                         `<div class="skin-cost" style="color:var(--jade)">✅ Desbloqueada</div>`}
         </div>`;
@@ -222,8 +226,8 @@ async function accionSkin(clave, tengo, esActiva) {
         if ((jugador.nivel||1) < skin.nivel_requerido)
             return showToast(`Necesitas nivel ${skin.nivel_requerido}`);
         if ((jugador.monedas||0) < skin.costo_monedas)
-            return showToast(`Necesitas ${skin.costo_monedas} monedas`);
-        if (!confirm(`¿Comprar ${skin.nombre} por ${skin.costo_monedas} monedas?`)) return;
+            return showToast(`Necesitas ${skin.costo_monedas} 🪙`);
+        if (!confirm(`¿Comprar ${skin.nombre} por ${skin.costo_monedas} 🪙?`)) return;
         try {
             const res = await fetch(`${API}/auth/comprar-skin`, {
                 method:'POST', headers:{'Content-Type':'application/json', authorization:token},
@@ -281,10 +285,10 @@ async function cargarHistorial() {
                 <div class="hi-stats">
                     <div class="hi-stat"><div class="v">${p.kills}</div><div class="l">Bajas</div></div>
                     <div class="hi-stat"><div class="v">${p.muertes}</div><div class="l">Muertes</div></div>
-                    <div class="hi-stat"><div class="v" style="color:var(--gold)">${p.monedas_ganadas}</div><div class="l">monedas</div></div>
+                    <div class="hi-stat"><div class="v" style="color:var(--gold)">${p.monedas_ganadas}</div><div class="l">🪙</div></div>
                 </div>
                 <div class="hi-pos ${p.posicion_final===1?'win':''}">
-                    ${p.posicion_final===1?'VICTORIA':'#'+p.posicion_final}
+                    ${p.posicion_final===1?'🏆':'#'+p.posicion_final}
                 </div>
             </div>
         `).join('');
