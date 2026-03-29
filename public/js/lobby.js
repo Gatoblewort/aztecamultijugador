@@ -42,7 +42,6 @@ async function login() {
         mostrarApp();
         conectarSocket();
         showToast(`¡Que comience la batalla, ${jugador.nombre}! ⚔️`);
-        // Fix desktop: forzar repaint para que el navegador aplique los cambios de clase
         document.getElementById('appScreen').offsetHeight;
     } catch { setError('Error de conexión'); }
 }
@@ -74,18 +73,16 @@ function logout() {
     token = null; jugador = null; buscando = false;
     document.querySelectorAll('.screen').forEach(s => {
         s.classList.remove('active');
-        s.style.display = ''; // limpiar inline styles
+        s.style.display = '';
     });
     document.getElementById('authScreen').classList.add('active');
 }
 
 // ── MOSTRAR APP ───────────────────────────────────────────────────────────
 function mostrarApp() {
-    // Limpiar inline styles primero — en desktop Chrome el inline style
-    // tiene más prioridad que las clases CSS y dejaba la pantalla trabada
     document.querySelectorAll('.screen').forEach(s => {
         s.classList.remove('active');
-        s.style.display = ''; // limpiar cualquier inline style previo
+        s.style.display = '';
     });
     document.getElementById('appScreen').classList.add('active');
     actualizarUI();
