@@ -102,6 +102,14 @@ function logout() {
     localStorage.removeItem('aw_token');
     localStorage.removeItem('aw_jugador');
     token = null; jugador = null; buscando = false;
+
+    // Resetear pantalla de auth al estado inicial
+    const box = document.getElementById('accesoRapidoBox');
+    if (box) box.style.display = 'none';
+    document.querySelectorAll('.auth-tabs').forEach(t => t.style.display = 'flex');
+    document.getElementById('loginForm').style.display    = 'block';
+    document.getElementById('registerForm').style.display = 'none';
+
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById('authScreen').classList.add('active');
 }
