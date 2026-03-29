@@ -39,7 +39,6 @@ async function login() {
         jugador = data.jugador;
         localStorage.setItem('aw_token',   token);
         localStorage.setItem('aw_jugador', JSON.stringify(jugador));
-        // Recargar la página — window.onload detecta el token y muestra el lobby
         window.location.reload();
     } catch { setError('Error de conexión'); }
 }
@@ -69,16 +68,14 @@ function logout() {
     localStorage.removeItem('aw_token');
     localStorage.removeItem('aw_jugador');
     token = null; jugador = null; buscando = false;
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById('authScreen').classList.add('active');
+    document.getElementById('appScreen').style.display = 'none';
+    document.getElementById('authScreen').style.display = 'flex';
 }
 
 // ── MOSTRAR APP ───────────────────────────────────────────────────────────
 function mostrarApp() {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById('appScreen').classList.add('active');
-    // Ocultar panel de auth que quedaba visible
     document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('appScreen').style.display = 'flex';
     actualizarUI();
     cargarPerfil();
     cargarRanking('puntos', document.querySelector('.rtab'));
@@ -187,7 +184,7 @@ function renderSkins() {
             <div class="skin-preview">${emoji}</div>
             <div class="skin-name">${skin.nombre}</div>
             <div class="skin-desc">${skin.descripcion}</div>
-            ${!tengo ? `<div class="skin-cost">🪙 ${skin.costo_monedas} monedas</div>
+            ${!tengo ? `<div class="skin-cost">monedas ${skin.costo_monedas} monedas</div>
                         <div class="skin-nivel">Nivel ${skin.nivel_requerido} requerido</div>` :
                         `<div class="skin-cost" style="color:var(--jade)">✅ Desbloqueada</div>`}
         </div>`;
@@ -225,8 +222,8 @@ async function accionSkin(clave, tengo, esActiva) {
         if ((jugador.nivel||1) < skin.nivel_requerido)
             return showToast(`Necesitas nivel ${skin.nivel_requerido}`);
         if ((jugador.monedas||0) < skin.costo_monedas)
-            return showToast(`Necesitas ${skin.costo_monedas} 🪙`);
-        if (!confirm(`¿Comprar ${skin.nombre} por ${skin.costo_monedas} 🪙?`)) return;
+            return showToast(`Necesitas ${skin.costo_monedas} monedas`);
+        if (!confirm(`¿Comprar ${skin.nombre} por ${skin.costo_monedas} monedas?`)) return;
         try {
             const res = await fetch(`${API}/auth/comprar-skin`, {
                 method:'POST', headers:{'Content-Type':'application/json', authorization:token},
