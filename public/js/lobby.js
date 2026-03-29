@@ -284,10 +284,10 @@ async function cargarHistorial() {
                 <div class="hi-stats">
                     <div class="hi-stat"><div class="v">${p.kills}</div><div class="l">Bajas</div></div>
                     <div class="hi-stat"><div class="v">${p.muertes}</div><div class="l">Muertes</div></div>
-                    <div class="hi-stat"><div class="v" style="color:var(--gold)">${p.monedas_ganadas}</div><div class="l">🪙</div></div>
+                    <div class="hi-stat"><div class="v" style="color:var(--gold)">${p.monedas_ganadas}</div><div class="l">monedas</div></div>
                 </div>
                 <div class="hi-pos ${p.posicion_final===1?'win':''}">
-                    ${p.posicion_final===1?'🏆':'#'+p.posicion_final}
+                    ${p.posicion_final===1?'VICTORIA':'#'+p.posicion_final}
                 </div>
             </div>
         `).join('');
