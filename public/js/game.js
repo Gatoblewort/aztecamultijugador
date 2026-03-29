@@ -422,22 +422,54 @@ function loop(ts) {
 }
 
 // ── Input ─────────────────────────────────────────────────────────────────
+const MOUSE_SENS = 0.0018; // sensibilidad mouse (ajustable)
+let mouseVelX = 0;         // velocidad angular para suavizado
+
 function initControles() {
     document.addEventListener('keydown', e => {
         if (chatAbierto) return;
         keys[e.code]=true;
         if (e.code==='KeyQ') cambiarArma();
         if (e.code==='KeyT') { e.preventDefault(); abrirChat(); }
-        if (e.code==='Escape') cerrarChat();
+        if (e.code==='Escape') {
+            if (document.pointerLockElement===canvas) document.exitPointerLock();
+            else cerrarChat();
+        }
     });
     document.addEventListener('keyup', e => { keys[e.code]=false; });
-    canvas.addEventListener('click', () => { if (!chatAbierto) canvas.requestPointerLock(); });
+
+    // Click en canvas — pedir pointer lock inmediatamente
+    canvas.addEventListener('click', () => {
+        if (!chatAbierto && document.pointerLockElement !== canvas)
+            canvas.requestPointerLock();
+    });
+
+    // Pointer lock change — feedback visual
+    document.addEventListener('pointerlockchange', () => {
+        const locked = document.pointerLockElement === canvas;
+        // Mostrar/ocultar crosshair según estado
+        const ch = document.getElementById('crosshair');
+        if (ch) ch.style.opacity = locked ? '1' : '0.3';
+    });
+
+    // Mouse move — rotación suave estilo Roblox
     document.addEventListener('mousemove', e => {
-        if (document.pointerLockElement===canvas&&vivo) yo.angle+=e.movementX*0.003;
+        if (document.pointerLockElement !== canvas || !vivo) return;
+        // Acumular velocidad para suavizado
+        mouseVelX += e.movementX * MOUSE_SENS;
     });
+
+    // Click izquierdo dispara (solo con pointer lock)
     canvas.addEventListener('mousedown', e => {
-        if (e.button===0&&document.pointerLockElement===canvas) disparar();
+        if (e.button === 0) {
+            if (document.pointerLockElement !== canvas) {
+                canvas.requestPointerLock();
+            } else {
+                disparar();
+            }
+        }
     });
+
     initJoystick();
 }
 
@@ -453,10 +485,16 @@ function procesarInput(dt) {
     if (keys['ArrowLeft'])  yo.angle-=TURN_SPD;
     if (keys['ArrowRight']) yo.angle+=TURN_SPD;
 
+    // Aplicar rotación del mouse con suavizado (estilo Roblox)
+    if (mouseVelX !== 0) {
+        yo.angle += mouseVelX;
+        mouseVelX *= 0.75; // fricción — se detiene suavemente
+        if (Math.abs(mouseVelX) < 0.0001) mouseVelX = 0;
+    }
+
     if (joystick.active) {
         nx+=Math.cos(yo.angle)*(-joystick.y)*spd + Math.cos(yo.angle+HALF_PI)*joystick.x*spd;
         ny+=Math.sin(yo.angle)*(-joystick.y)*spd + Math.sin(yo.angle+HALF_PI)*joystick.x*spd;
-        // joystick.rx ya no se usa — el giro se aplica directo en lookZone.touchmove
     }
 
     const m=PLAYER_SPD*0.8;
@@ -699,7 +737,8 @@ function renderSprites() {
         let a=angle;
         while(a<-Math.PI)a+=TWO_PI;
         while(a>Math.PI)a-=TWO_PI;
-        if (Math.abs(a)>FOV/1.8) continue;
+        // FOV/1.8 era muy amplio — reducir a FOV/2 para no ver sprites detrás de paredes
+        if (Math.abs(a)>FOV/2) continue;
 
         const scx=(a/FOV+.5)*W;
         // Guard: evitar división por cero y sprites gigantes cuando dist es muy pequeña
@@ -1141,5 +1180,12 @@ function addKillfeed(txt,esMio=false){
 // ── Utilidades ────────────────────────────────────────────────────────────
 function setText(id,val){const el=document.getElementById(id);if(el)el.textContent=val;}
 function escHtml(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML;}
-function volverLobby(){socket.disconnect();sessionStorage.removeItem('aw_partida');window.location.href='/';}
+function volverLobby(){
+    // Limpiar estado del juego
+    if (socket) { socket.disconnect(); socket = null; }
+    sessionStorage.removeItem('aw_partida');
+    sessionStorage.removeItem('aw_socket_id');
+    // replace evita que el back-button regrese al juego
+    window.location.replace('/');
+}
 function rgba32(r,g,b,a=255){return((a&0xff)<<24)|((b&0xff)<<16)|((g&0xff)<<8)|(r&0xff);}
