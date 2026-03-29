@@ -428,7 +428,7 @@ function initControles() {
     document.addEventListener('keydown', e => {
         if (chatAbierto) return;
         keys[e.code]=true;
-        if (e.code==='KeyQ' || e.code==='Tab') { e.preventDefault(); cambiarArma(); }
+        if (e.code==='KeyQ') cambiarArma();
         if (e.code==='KeyT') { e.preventDefault(); abrirChat(); }
         if (e.code==='Escape') {
             if (document.pointerLockElement===canvas) document.exitPointerLock();
@@ -437,12 +437,15 @@ function initControles() {
     });
     document.addEventListener('keyup', e => { keys[e.code]=false; });
 
-    // Click en canvas — capturar mouse (pointer lock)
-    canvas.addEventListener('click', () => {
+    // lookZone cubre todo el canvas en desktop y mitad derecha en móvil
+    const lz = document.getElementById('lookZone');
+
+    // Click en lookZone — capturar mouse
+    lz.addEventListener('click', () => {
         if (!chatAbierto) canvas.requestPointerLock();
     });
 
-    // Pointer lock: feedback visual en crosshair
+    // Pointer lock change — feedback visual
     document.addEventListener('pointerlockchange', () => {
         const locked = document.pointerLockElement === canvas;
         const ch = document.getElementById('crosshair');
@@ -455,8 +458,8 @@ function initControles() {
         yo.angle += e.movementX * MOUSE_SENS;
     });
 
-    // Click izquierdo — si no hay lock: capturar; si hay lock: disparar
-    canvas.addEventListener('mousedown', e => {
+    // Click izquierdo — capturar o disparar
+    lz.addEventListener('mousedown', e => {
         if (e.button === 0) {
             if (document.pointerLockElement !== canvas) {
                 canvas.requestPointerLock();
@@ -467,7 +470,7 @@ function initControles() {
     });
 
     // Rueda del mouse — cambiar arma
-    canvas.addEventListener('wheel', e => {
+    lz.addEventListener('wheel', e => {
         e.preventDefault();
         cambiarArma();
     }, { passive: false });
