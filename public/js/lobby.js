@@ -39,14 +39,8 @@ async function login() {
         jugador = data.jugador;
         localStorage.setItem('aw_token',   token);
         localStorage.setItem('aw_jugador', JSON.stringify(jugador));
-        // Mostrar app primero, dejar que el browser pinte, LUEGO conectar socket
-        mostrarApp();
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                conectarSocket();
-                showToast(`¡Que comience la batalla, ${jugador.nombre}! ⚔️`);
-            });
-        });
+        // Recargar la página — window.onload detecta el token y muestra el lobby
+        window.location.reload();
     } catch { setError('Error de conexión'); }
 }
 
@@ -75,30 +69,16 @@ function logout() {
     localStorage.removeItem('aw_token');
     localStorage.removeItem('aw_jugador');
     token = null; jugador = null; buscando = false;
-    const appS = document.getElementById('appScreen');
-    appS.classList.remove('active');
-    appS.style.cssText = 'display:none !important';
-    const authS = document.getElementById('authScreen');
-    authS.style.cssText = '';
-    authS.classList.add('active');
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('authScreen').classList.add('active');
 }
 
 // ── MOSTRAR APP ───────────────────────────────────────────────────────────
 function mostrarApp() {
-    // Ocultar auth completamente
-    const auth = document.getElementById('authScreen');
-    auth.classList.remove('active');
-    auth.style.cssText = 'display:none !important';
-
-    // Mostrar app
-    const app = document.getElementById('appScreen');
-    app.style.cssText = '';
-    app.classList.add('active');
-
-    // Scroll al inicio
-    window.scrollTo(0, 0);
-    app.scrollTop = 0;
-
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('appScreen').classList.add('active');
+    // Ocultar panel de auth que quedaba visible
+    document.getElementById('authScreen').style.display = 'none';
     actualizarUI();
     cargarPerfil();
     cargarRanking('puntos', document.querySelector('.rtab'));
