@@ -795,31 +795,43 @@ function renderSprites() {
             }
 
         } else if (sp.type==='moneda') {
-            // Moneda pixel art — pequeña, discreta, gira suavemente
-            const csz=Math.max(3,Math.floor(sw*.45)); // más pequeña que antes
-            const bob=Math.sin(gameTime*3+(sp.m.bob||0))*4;
+            // Moneda pixel art circular estilo Mario — pequeña y redonda
+            const csz=Math.max(4,Math.floor(sw*.32)); // bien pequeña
+            const bob=Math.sin(gameTime*4+(sp.m.bob||0))*3;
             const cx2=Math.floor(scx), cy2=Math.floor(H/2+bob);
             let vis=false;
             for(let c=cx2-csz;c<cx2+csz&&!vis;c++)if(c>=0&&c<W&&sp.dist<zBuffer[c])vis=true;
             if(!vis) continue;
-            // Efecto giro: la moneda aplana en X según coseno
-            const giro=Math.abs(Math.cos(gameTime*2+(sp.m.bob||0)));
-            const rx=Math.max(1,Math.floor(csz*giro)), ry=Math.max(2,csz);
-            const p=Math.floor(Math.max(1,csz/4)); // tamaño píxel
+            // Efecto giro: aplanar en X como moneda girando
+            const giro=Math.abs(Math.cos(gameTime*3+(sp.m.bob||0)));
+            const px=Math.max(1,Math.floor(csz/7)); // tamaño de cada píxel del grid
+            // Grid 7×7 circular (0=vacío, 1=borde oscuro, 2=dorado, 3=brillo)
+            const cmap=[
+                [0,0,1,1,1,0,0],
+                [0,1,2,2,2,1,0],
+                [1,2,3,2,2,2,1],
+                [1,2,3,2,2,2,1],
+                [1,2,2,2,2,2,1],
+                [0,1,2,2,2,1,0],
+                [0,0,1,1,1,0,0],
+            ];
             ctx.imageSmoothingEnabled=false;
-            // Cara principal dorada
-            ctx.fillStyle='#c8860a';
-            ctx.fillRect(cx2-rx,cy2-ry,rx*2,ry*2);
-            // Brillo superior
-            ctx.fillStyle='#ffd60a';
-            ctx.fillRect(cx2-rx,cy2-ry,rx*2,p);
-            ctx.fillRect(cx2-rx,cy2-ry,p,ry);
-            // Detalle central: símbolo azteca simple (punto oscuro)
-            ctx.fillStyle='#8a5c00';
-            ctx.fillRect(cx2-p,cy2-p,p*2,p*2);
-            // Borde oscuro
-            ctx.fillStyle='#6a3c00';
-            ctx.fillRect(cx2-rx,cy2+ry-p,rx*2,p);
+            ctx.shadowColor='#ffd60a'; ctx.shadowBlur=5;
+            const anchoGiro=Math.max(1,Math.floor(7*px*giro));
+            const offX=cx2-Math.floor(anchoGiro/2);
+            const oy2=cy2-Math.floor(7*px/2);
+            for(let row=0;row<7;row++){
+                for(let col=0;col<7;col++){
+                    const v=cmap[row][col];
+                    if(!v) continue;
+                    const x0=offX+Math.floor(col*anchoGiro/7);
+                    const x1=offX+Math.floor((col+1)*anchoGiro/7);
+                    const wd=Math.max(1,x1-x0);
+                    ctx.fillStyle=v===3?'#fff5a0':v===2?'#f5c400':'#8a5c00';
+                    ctx.fillRect(x0, oy2+row*px, wd, px);
+                }
+            }
+            ctx.shadowBlur=0;
             ctx.imageSmoothingEnabled=true;
 
         } else if (sp.type==='corazon') {
@@ -862,37 +874,38 @@ function renderSprites() {
             ctx.imageSmoothingEnabled=true;
 
         } else if (sp.type==='ammo') {
-            // Munición pixel art — tres cartuchos apilados estilo retro
-            const asz=Math.max(8,Math.floor(sw*.7));
-            const bob=Math.sin(gameTime*3.5+(sp.a.bob||0))*4;
+            // Munición pixel art — pequeña, grid 5×9 un solo cartucho
+            const asz=Math.max(4,Math.floor(sw*.28)); // muy pequeña
+            const bob=Math.sin(gameTime*3.5+(sp.a.bob||0))*3;
             const cx2=Math.floor(scx), cy2=Math.floor(H/2+bob);
             let vis=false;
             for(let c=cx2-asz;c<cx2+asz&&!vis;c++)if(c>=0&&c<W&&sp.dist<zBuffer[c])vis=true;
             if(!vis) continue;
             ctx.imageSmoothingEnabled=false;
-            const p=Math.max(1,Math.floor(asz/6)); // píxel base
-            const bw=p*2, bh=p*5; // ancho y alto de cada cartucho
-            const pulse=.8+.2*Math.sin(gameTime*5+(sp.a.bob||0));
-            // Tres cartuchos lado a lado
-            const offsets=[-bw-p, 0, bw+p];
-            for(const ox of offsets){
-                const bx=cx2+ox-Math.floor(bw/2), by=cy2-Math.floor(bh/2);
-                // Vaina (bronce/cobre)
-                ctx.fillStyle=`rgba(${Math.floor(180*pulse)},${Math.floor(110*pulse)},${Math.floor(20*pulse)},1)`;
-                ctx.fillRect(bx, by+p, bw, bh-p);
-                // Punta de la bala (gris plomo)
-                ctx.fillStyle=`rgba(${Math.floor(160*pulse)},${Math.floor(165*pulse)},${Math.floor(170*pulse)},1)`;
-                ctx.fillRect(bx, by, bw, p+1);
-                // Línea de brillo izquierda
-                ctx.fillStyle=`rgba(230,180,80,${pulse})`;
-                ctx.fillRect(bx, by+p, 1, bh-p-1);
-                // Base oscura
-                ctx.fillStyle='#3a2000';
-                ctx.fillRect(bx, by+bh-1, bw, 1);
+            const p=Math.max(1,Math.floor(asz/5)); // tamaño de cada píxel
+            // Grid 5 cols × 9 filas (0=vacío, 1=plomo, 2=bronce, 3=brillo, 4=base oscura)
+            const amap=[
+                [0,1,1,1,0],
+                [0,1,3,1,0],
+                [1,2,3,2,1],
+                [1,2,3,2,1],
+                [1,2,2,2,1],
+                [1,2,2,2,1],
+                [1,2,2,2,1],
+                [1,2,2,2,1],
+                [1,4,4,4,1],
+            ];
+            const ox2=cx2-Math.floor(5*p/2);
+            const oy3=cy2-Math.floor(9*p/2);
+            ctx.shadowColor='#c87010'; ctx.shadowBlur=4;
+            for(let row=0;row<9;row++){
+                for(let col=0;col<5;col++){
+                    const v=amap[row][col];
+                    if(!v) continue;
+                    ctx.fillStyle=v===1?'#b0b5b8':v===2?'#c87010':v===3?'#e8c060':'#3a1800';
+                    ctx.fillRect(ox2+col*p, oy3+row*p, p, p);
+                }
             }
-            // Brillo general
-            ctx.shadowColor='#c87010'; ctx.shadowBlur=6;
-            ctx.fillStyle='rgba(0,0,0,0)'; ctx.fillRect(0,0,1,1); // forzar shadow flush
             ctx.shadowBlur=0;
             ctx.imageSmoothingEnabled=true;
         }
