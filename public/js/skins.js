@@ -32,94 +32,151 @@ function C(r, g, b, bright=1) {
 SKINS.conquistador = {
     nombre: 'Conquistador',
 
+    // Paleta (índices usados en el grid)
+    // 0=transparente, 1=negro borde, 2=plateado claro, 3=plateado medio,
+    // 4=plateado oscuro, 5=piel, 6=piel sombra, 7=marrón ropa, 8=marrón oscuro,
+    // 9=rojo capa, A=dorado, B=barba, C=bota oscura, D=blanco ojo, E=pluma roja, F=pluma amarilla
+    _pal: {
+        0:null,
+        1:[20,18,16],    // borde negro
+        2:[210,215,220], // plateado claro
+        3:[160,165,175], // plateado medio
+        4:[100,105,115], // plateado oscuro
+        5:[205,170,135], // piel
+        6:[160,115,85],  // piel sombra/barba
+        7:[110,70,40],   // marrón ropa
+        8:[65,38,20],    // marrón oscuro / bota
+        9:[180,25,25],   // rojo capa/pluma
+        A:[200,165,40],  // dorado detalle
+        B:[75,50,30],    // barba oscura
+        C:[40,28,18],    // bota muy oscura
+        D:[240,240,240], // blanco ojo
+        E:[200,30,20],   // pluma roja
+        F:[230,190,30],  // pluma amarilla
+    },
+
+    // Grid 16 columnas × 24 filas — de arriba abajo:
+    // filas 0-1: plumas del morión
+    // filas 2-4: casco morión
+    // filas 5-7: cabeza/cara/barba
+    // filas 8-9: cuello/gorguera
+    // filas 10-15: torso armadura + brazos
+    // filas 16-19: cadera/falda metálica
+    // filas 20-23: piernas y botas
+    _grid: [
+        // 0         4         8         12
+        [0,0,0,0,0,0,0,F,E,0,0,0,0,0,0,0], // 0 plumas
+        [0,0,0,0,0,0,F,F,E,E,0,0,0,0,0,0], // 1 plumas
+        [0,0,0,0,1,3,3,3,3,3,3,1,0,0,0,0], // 2 ala morión
+        [0,0,0,1,3,2,2,2,2,2,3,3,1,0,0,0], // 3 casco
+        [0,0,0,1,4,3,2,2,2,3,4,3,1,0,0,0], // 4 casco bajo
+        [0,0,0,0,1,5,5,5,5,5,5,1,0,0,0,0], // 5 cara arriba
+        [0,0,0,0,1,5,D,5,5,D,5,1,0,0,0,0], // 6 ojos
+        [0,0,0,0,1,6,B,B,B,B,6,1,0,0,0,0], // 7 barba
+        [0,0,0,1,3,3,3,3,3,3,3,3,1,0,0,0], // 8 gorguera
+        [0,0,1,9,3,3,3,3,3,3,3,3,9,1,0,0], // 9 hombros+capa
+        [0,1,3,3,3,2,2,2,2,2,3,3,3,3,1,0], // 10 pecho armadura
+        [0,1,3,4,3,2,4,2,2,4,2,3,4,3,1,0], // 11 pecho detalle
+        [1,3,7,3,3,2,2,2,2,2,2,3,3,7,3,1], // 12 brazos+torso
+        [1,7,7,3,3,2,2,2,2,2,2,3,3,7,7,1], // 13 brazos+torso
+        [1,7,7,3,3,2,A,2,2,A,2,3,3,7,7,1], // 14 torso dorado
+        [1,7,7,3,2,2,2,2,2,2,2,2,3,7,7,1], // 15 torso bajo
+        [0,1,7,3,3,3,3,3,3,3,3,3,3,7,1,0], // 16 falda met.
+        [0,0,1,3,4,3,3,3,3,3,3,4,3,1,0,0], // 17 falda met. bajo
+        [0,0,1,7,7,3,0,0,0,0,3,7,7,1,0,0], // 18 muslos
+        [0,0,1,7,7,3,0,0,0,0,3,7,7,1,0,0], // 19 muslos
+        [0,0,1,7,8,0,0,0,0,0,0,8,7,1,0,0], // 20 rodillas
+        [0,0,0,1,8,C,0,0,0,0,C,8,1,0,0,0], // 21 piernas
+        [0,0,0,1,8,C,0,0,0,0,C,8,1,0,0,0], // 22 piernas
+        [0,0,0,1,C,C,C,0,0,C,C,C,1,0,0,0], // 23 botas
+    ],
+
     draw(ctx, x, y, w, h, t, bright, aiEstado) {
-        const br = bright;
-        const walk = Math.sin(t * 8) * h * 0.05; // animación de caminar
+        const br   = bright;
+        const pal  = this._pal;
+        const grid = this._grid;
+        const ROWS = 24, COLS = 16;
 
-        // Sombra
-        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        // Tamaño de cada píxel del grid
+        const pw = w / COLS;
+        const ph = h / ROWS;
+
+        // Animación de caminar: offset vertical en piernas (filas 18-23)
+        const walk = Math.sin(t * 7) * ph * 0.8;
+
+        ctx.imageSmoothingEnabled = false;
+
+        // Sombra elíptica en el suelo
+        ctx.fillStyle = 'rgba(0,0,0,0.28)';
         ctx.beginPath();
-        ctx.ellipse(x+w/2, y+h, w*0.3, h*0.04, 0, 0, Math.PI*2);
+        ctx.ellipse(x+w/2, y+h+ph*0.5, w*0.28, ph*0.6, 0, 0, Math.PI*2);
         ctx.fill();
 
-        // Capa roja (detrás del cuerpo)
-        ctx.fillStyle = C(180,20,20, br);
-        ctx.fillRect(x+w*0.10, y+h*0.28, w*0.80, h*0.55);
+        // Dibujar cada píxel del grid
+        for (let row = 0; row < ROWS; row++) {
+            for (let col = 0; col < COLS; col++) {
+                const v = grid[row][col];
+                if (!v || v === 0) continue;
+                const rgb = pal[v];
+                if (!rgb) continue;
 
-        // Piernas con armadura
-        ctx.fillStyle = C(160,165,175, br);
-        ctx.fillRect(x+w*0.20, y+h*0.65, w*0.25, h*0.30+walk);
-        ctx.fillRect(x+w*0.55, y+h*0.65, w*0.25, h*0.30-walk);
+                ctx.fillStyle = C(rgb[0], rgb[1], rgb[2], br);
 
-        // Botas oscuras
-        ctx.fillStyle = C(40,30,25, br);
-        ctx.fillRect(x+w*0.20, y+h*0.87+walk,  w*0.25, h*0.08);
-        ctx.fillRect(x+w*0.55, y+h*0.87-walk, w*0.25, h*0.08);
+                let px = Math.floor(x + col * pw);
+                let py = Math.floor(y + row * ph);
+                const bw = Math.max(1, Math.floor(pw));
+                const bh = Math.max(1, Math.floor(ph));
 
-        // Torso — peto de armadura
-        ctx.fillStyle = C(160,165,175, br);
-        ctx.fillRect(x+w*0.22, y+h*0.30, w*0.56, h*0.35);
+                // Animación piernas: filas 18+ oscilan
+                if (row >= 18) {
+                    // pierna izquierda (cols 3-4) y derecha (cols 11-12) en sentidos opuestos
+                    if (col <= 5)       py = Math.floor(py + walk);
+                    else if (col >= 10) py = Math.floor(py - walk);
+                }
 
-        // Detalle central del peto
-        ctx.fillStyle = C(100,105,115, br);
-        ctx.fillRect(x+w*0.47, y+h*0.32, w*0.06, h*0.30);
-
-        // Hombros (pauldrons)
-        ctx.fillStyle = C(160,165,175, br);
-        ctx.fillRect(x+w*0.06, y+h*0.28, w*0.18, h*0.12);
-        ctx.fillRect(x+w*0.76, y+h*0.28, w*0.18, h*0.12);
-
-        // Brazos
-        ctx.fillRect(x+w*0.04, y+h*0.35, w*0.15, h*0.28);
-        ctx.fillRect(x+w*0.81, y+h*0.35, w*0.15, h*0.28);
-
-        // Escudo circular izquierdo
-        ctx.fillStyle = C(160,130,60, br);
-        const shR = Math.floor(w*0.15);
-        const shCX = Math.floor(x+w*0.06), shCY = Math.floor(y+h*0.48);
-        ctx.beginPath();
-        ctx.arc(shCX, shCY, shR, 0, Math.PI*2);
-        ctx.fill();
-        // Cruz en el escudo
-        ctx.fillStyle = C(200,20,20, br);
-        ctx.fillRect(shCX-shR/2, shCY-shR/4, shR, shR/3);
-        ctx.fillRect(shCX-shR/4, shCY-shR/2, shR/3, shR);
-
-        // Espada derecha (solo si en alerta)
-        if (aiEstado && aiEstado !== 'patrol') {
-            ctx.fillStyle = C(210,215,220, br);
-            const swX = Math.floor(x+w*0.84);
-            ctx.fillRect(swX, y+h*0.18, w*0.08, h*0.48);
-            ctx.fillStyle = C(180,150,40, br);
-            ctx.fillRect(swX-w*0.04, y+h*0.34, w*0.18, h*0.04);
+                ctx.fillRect(px, py, bw, bh);
+            }
         }
 
-        // Gorguera (cuello)
-        ctx.fillStyle = C(160,165,175, br);
-        ctx.fillRect(x+w*0.32, y+h*0.26, w*0.36, h*0.07);
+        // Mosquete (solo en alerta) — atravesado frente al torso
+        if (aiEstado && aiEstado !== 'patrol') {
+            const gx = Math.floor(x + pw*2);
+            const gy = Math.floor(y + ph*11);
+            const gl = Math.floor(pw*12); // largo del cañón
+            const gt = Math.max(1, Math.floor(ph*0.9)); // grosor
 
-        // Cabeza — piel
-        ctx.fillStyle = C(220,185,160, br);
-        ctx.fillRect(x+w*0.30, y+h*0.13, w*0.40, h*0.14);
+            // Culata (madera)
+            ctx.fillStyle = C(100,60,20, br);
+            ctx.fillRect(gx, gy+gt, Math.floor(pw*3), Math.floor(ph*2));
+            // Cañón (metal)
+            ctx.fillStyle = C(80,85,90, br);
+            ctx.fillRect(gx+Math.floor(pw*2), gy, gl, gt);
+            // Brillo cañón
+            ctx.fillStyle = C(160,165,170, br);
+            ctx.fillRect(gx+Math.floor(pw*2), gy, gl, Math.max(1,Math.floor(gt*0.4)));
 
-        // Barba
-        ctx.fillStyle = C(80,55,35, br);
-        ctx.fillRect(x+w*0.33, y+h*0.22, w*0.34, h*0.06);
+            // Flash de disparo (parpadea con el tiempo)
+            const flash = Math.sin(t * 18) > 0.3;
+            if (flash) {
+                // Núcleo blanco
+                ctx.fillStyle = `rgba(255,255,200,${br*0.95})`;
+                ctx.fillRect(gx+gl+Math.floor(pw*2), gy-Math.floor(ph), Math.floor(pw*2), Math.floor(ph*3));
+                // Corona naranja
+                ctx.fillStyle = `rgba(255,140,0,${br*0.8})`;
+                ctx.fillRect(gx+gl+Math.floor(pw), gy-Math.floor(ph*1.5), Math.floor(pw*3), Math.floor(ph*4));
+                // Chispas exteriores
+                ctx.fillStyle = `rgba(255,80,0,${br*0.6})`;
+                ctx.fillRect(gx+gl, gy-Math.floor(ph*2), Math.floor(pw*4), Math.floor(ph*5));
+            }
+        } else {
+            // En patrulla: espada colgada a un lado (píxeles simples)
+            ctx.fillStyle = C(180,185,190, br);
+            ctx.fillRect(Math.floor(x+pw*13), Math.floor(y+ph*14), Math.max(1,Math.floor(pw)), Math.floor(ph*6));
+            ctx.fillStyle = C(160,130,40, br);
+            ctx.fillRect(Math.floor(x+pw*12), Math.floor(y+ph*16), Math.max(1,Math.floor(pw*3)), Math.max(1,Math.floor(ph)));
+        }
 
-        // Celada (casco)
-        ctx.fillStyle = C(160,165,175, br);
-        ctx.fillRect(x+w*0.27, y+h*0.00, w*0.46, h*0.08);
-        ctx.fillRect(x+w*0.25, y+h*0.07, w*0.50, h*0.07);
-
-        // Cresta del casco
-        ctx.fillStyle = C(200,20,20, br);
-        ctx.fillRect(x+w*0.42, y-h*0.05, w*0.16, h*0.07);
-
-        // Ojos
-        const eyeY = Math.floor(y+h*0.15);
-        ctx.fillStyle = aiEstado && aiEstado!=='patrol' ? C(200,20,20,br) : C(50,100,200,br);
-        ctx.fillRect(x+w*0.34, eyeY, w*0.10, h*0.05);
-        ctx.fillRect(x+w*0.56, eyeY, w*0.10, h*0.05);
+        ctx.imageSmoothingEnabled = true;
     }
 };
 
