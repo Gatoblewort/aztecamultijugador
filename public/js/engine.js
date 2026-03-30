@@ -238,7 +238,7 @@ function spawnPickups(estado) {
         while (mapa.tiles[ty][tx] !== 0 && tries < 100);
         if (mapa.tiles[ty][tx] === 0)
             estado.coins.push({ id:`c${id++}`, x:tx*TILE+32, y:ty*TILE+32,
-                                valor:3+Math.floor(Math.random()*6), bob:Math.random()*6.28 });
+                                valor:1+Math.floor(Math.random()*3), bob:Math.random()*6.28 });
     }
     for (let i = 0; i < heartCount; i++) {
         let tx, ty, tries=0;
@@ -362,7 +362,7 @@ function updateBullets(estado, dt) {
                 for (const e of enemies) {
                     if (!e.active) continue;
                     if (dist(b.x,b.y,e.x,e.y) < 64) {
-                        e.hp -= b.danio;
+                        e.hp -= Math.floor(b.danio * 0.4); // daño reducido — NPCs duran más
                         b.active = false; // FIX: destruir bala al impactar NPC
                         hit = true;
                         // Notificar daño al NPC
@@ -380,7 +380,7 @@ function updateBullets(estado, dt) {
                                 estado.onMuerteNPC(e.id, b.fromId, tirador?.kills ?? 0);
                             // Spawn drops
                             estado.coins.push({ id:`dc_${Date.now()}`, x:e.x, y:e.y,
-                                valor:10+level*5, bob:Math.random()*6.28 });
+                                valor:2+level*2, bob:Math.random()*6.28 });
                             if (Math.random() < 0.3)
                                 estado.hearts.push({ id:`dh_${Date.now()}`, x:e.x, y:e.y,
                                     heal:25, bob:Math.random()*6.28 });

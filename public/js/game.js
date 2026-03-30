@@ -795,53 +795,106 @@ function renderSprites() {
             }
 
         } else if (sp.type==='moneda') {
-            const csz=Math.max(4,Math.floor(sw*.8));
-            const cx2=Math.floor(scx),cy2=Math.floor(H/2+Math.sin(gameTime*3+(sp.m.bob||0))*6);
+            // Moneda pixel art — pequeña, discreta, gira suavemente
+            const csz=Math.max(3,Math.floor(sw*.45)); // más pequeña que antes
+            const bob=Math.sin(gameTime*3+(sp.m.bob||0))*4;
+            const cx2=Math.floor(scx), cy2=Math.floor(H/2+bob);
             let vis=false;
-            for (let c=cx2-csz/2;c<cx2+csz/2&&!vis;c++)if(c>=0&&c<W&&sp.dist<zBuffer[c])vis=true;
-            if (!vis) continue;
-            const rot=Math.abs(Math.cos(gameTime*2.5+(sp.m.bob||0)));
-            const radioX=Math.max(2,Math.floor(csz/2*rot));
-            const radioY=Math.max(2,Math.floor(csz/2));
+            for(let c=cx2-csz;c<cx2+csz&&!vis;c++)if(c>=0&&c<W&&sp.dist<zBuffer[c])vis=true;
+            if(!vis) continue;
+            // Efecto giro: la moneda aplana en X según coseno
+            const giro=Math.abs(Math.cos(gameTime*2+(sp.m.bob||0)));
+            const rx=Math.max(1,Math.floor(csz*giro)), ry=Math.max(2,csz);
+            const p=Math.floor(Math.max(1,csz/4)); // tamaño píxel
+            ctx.imageSmoothingEnabled=false;
+            // Cara principal dorada
+            ctx.fillStyle='#c8860a';
+            ctx.fillRect(cx2-rx,cy2-ry,rx*2,ry*2);
+            // Brillo superior
             ctx.fillStyle='#ffd60a';
-            ctx.shadowColor='#ffd60a';ctx.shadowBlur=12;
-            ctx.beginPath();
-            ctx.ellipse(cx2,cy2,radioX,radioY,0,0,TWO_PI);
-            ctx.fill();
-            ctx.fillStyle='rgba(255,255,180,0.6)';
-            ctx.beginPath();
-            ctx.ellipse(cx2-radioX*0.2,cy2-radioY*0.3,Math.max(1,radioX*0.3),Math.max(1,radioY*0.3),0,0,TWO_PI);
-            ctx.fill();
-            ctx.shadowBlur=0;
+            ctx.fillRect(cx2-rx,cy2-ry,rx*2,p);
+            ctx.fillRect(cx2-rx,cy2-ry,p,ry);
+            // Detalle central: símbolo azteca simple (punto oscuro)
+            ctx.fillStyle='#8a5c00';
+            ctx.fillRect(cx2-p,cy2-p,p*2,p*2);
+            // Borde oscuro
+            ctx.fillStyle='#6a3c00';
+            ctx.fillRect(cx2-rx,cy2+ry-p,rx*2,p);
+            ctx.imageSmoothingEnabled=true;
 
         } else if (sp.type==='corazon') {
-            const hsz=Math.max(6,Math.floor(sw*.7));
-            const cx2=Math.floor(scx),cy2=Math.floor(H/2+Math.sin(gameTime*2.5+(sp.h.bob||0))*6);
+            // Corazón pixel art — forma clásica de corazón en cuadrícula
+            const hsz=Math.max(8,Math.floor(sw*.65));
+            const bob=Math.sin(gameTime*2.5+(sp.h.bob||0))*5;
+            const cx2=Math.floor(scx), cy2=Math.floor(H/2+bob);
             let vis=false;
-            for(let c=cx2-hsz/2;c<cx2+hsz/2&&!vis;c++)if(c>=0&&c<W&&sp.dist<zBuffer[c])vis=true;
-            if (!vis) continue;
-            // Dibujar corazón como pixel art
-            ctx.fillStyle=`rgb(220,50,80)`;
-            ctx.shadowColor='#ff4466';ctx.shadowBlur=8;
-            ctx.fillRect(cx2-hsz/2,cy2-hsz/4,hsz/2,hsz/2);
-            ctx.fillRect(cx2,cy2-hsz/4,hsz/2,hsz/2);
-            ctx.fillRect(cx2-hsz/2,cy2,hsz,hsz/2);
-            for(let row=0;row<hsz/4;row++){const w2=hsz-row*2;ctx.fillRect(cx2-w2/2,cy2+hsz/2+row,w2,1);}
+            for(let c=cx2-hsz;c<cx2+hsz&&!vis;c++)if(c>=0&&c<W&&sp.dist<zBuffer[c])vis=true;
+            if(!vis) continue;
+            const p=Math.max(1,Math.floor(hsz/8)); // tamaño de cada píxel
+            // pulso de escala suave
+            const pulso=1+0.12*Math.sin(gameTime*4+(sp.h.bob||0));
+            const s=Math.floor(hsz*pulso);
+            const ox=cx2-Math.floor(s/2), oy=cy2-Math.floor(s/2);
+            ctx.imageSmoothingEnabled=false;
+            // Mapa de píxeles del corazón (8×8 grid, 0=vacío 1=rojo 2=claro)
+            // Clásica forma de corazón pixel art
+            const px=Math.max(1,Math.floor(s/8));
+            const hmap=[
+                [0,1,1,0,0,1,1,0],
+                [1,2,1,1,1,1,2,1],
+                [1,2,2,1,1,2,2,1],
+                [1,1,1,1,1,1,1,1],
+                [0,1,1,1,1,1,1,0],
+                [0,0,1,1,1,1,0,0],
+                [0,0,0,1,1,0,0,0],
+                [0,0,0,0,0,0,0,0],
+            ];
+            ctx.shadowColor='#ff4466'; ctx.shadowBlur=10;
+            for(let row=0;row<8;row++){
+                for(let col=0;col<8;col++){
+                    const v=hmap[row][col];
+                    if(!v) continue;
+                    ctx.fillStyle=v===2?'#ff8899':'#dd1144';
+                    ctx.fillRect(ox+col*px, oy+row*px, px, px);
+                }
+            }
             ctx.shadowBlur=0;
+            ctx.imageSmoothingEnabled=true;
 
         } else if (sp.type==='ammo') {
-            const asz=Math.max(6,Math.floor(sw*.75));
-            const cx2=Math.floor(scx),cy2=Math.floor(H/2+Math.sin(gameTime*3.5+(sp.a.bob||0))*5);
+            // Munición pixel art — tres cartuchos apilados estilo retro
+            const asz=Math.max(8,Math.floor(sw*.7));
+            const bob=Math.sin(gameTime*3.5+(sp.a.bob||0))*4;
+            const cx2=Math.floor(scx), cy2=Math.floor(H/2+bob);
             let vis=false;
-            for(let c=cx2-asz/2;c<cx2+asz/2&&!vis;c++)if(c>=0&&c<W&&sp.dist<zBuffer[c])vis=true;
-            if (!vis) continue;
-            const pulse=.7+.3*Math.sin(gameTime*4+(sp.a.bob||0));
-            ctx.fillStyle=`rgba(80,200,255,${pulse})`;
-            ctx.shadowColor='#50c8ff';ctx.shadowBlur=8;
-            ctx.fillRect(cx2-asz/4,cy2-asz/2,asz/2,asz);
-            ctx.fillStyle=`rgba(40,120,200,${pulse})`;
-            ctx.fillRect(cx2-asz/6,cy2-asz/2-asz/4,asz/3,asz/4);
+            for(let c=cx2-asz;c<cx2+asz&&!vis;c++)if(c>=0&&c<W&&sp.dist<zBuffer[c])vis=true;
+            if(!vis) continue;
+            ctx.imageSmoothingEnabled=false;
+            const p=Math.max(1,Math.floor(asz/6)); // píxel base
+            const bw=p*2, bh=p*5; // ancho y alto de cada cartucho
+            const pulse=.8+.2*Math.sin(gameTime*5+(sp.a.bob||0));
+            // Tres cartuchos lado a lado
+            const offsets=[-bw-p, 0, bw+p];
+            for(const ox of offsets){
+                const bx=cx2+ox-Math.floor(bw/2), by=cy2-Math.floor(bh/2);
+                // Vaina (bronce/cobre)
+                ctx.fillStyle=`rgba(${Math.floor(180*pulse)},${Math.floor(110*pulse)},${Math.floor(20*pulse)},1)`;
+                ctx.fillRect(bx, by+p, bw, bh-p);
+                // Punta de la bala (gris plomo)
+                ctx.fillStyle=`rgba(${Math.floor(160*pulse)},${Math.floor(165*pulse)},${Math.floor(170*pulse)},1)`;
+                ctx.fillRect(bx, by, bw, p+1);
+                // Línea de brillo izquierda
+                ctx.fillStyle=`rgba(230,180,80,${pulse})`;
+                ctx.fillRect(bx, by+p, 1, bh-p-1);
+                // Base oscura
+                ctx.fillStyle='#3a2000';
+                ctx.fillRect(bx, by+bh-1, bw, 1);
+            }
+            // Brillo general
+            ctx.shadowColor='#c87010'; ctx.shadowBlur=6;
+            ctx.fillStyle='rgba(0,0,0,0)'; ctx.fillRect(0,0,1,1); // forzar shadow flush
             ctx.shadowBlur=0;
+            ctx.imageSmoothingEnabled=true;
         }
     }
 }
