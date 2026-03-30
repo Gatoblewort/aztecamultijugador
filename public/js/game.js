@@ -422,7 +422,8 @@ function loop(ts) {
 }
 
 // ── Input ─────────────────────────────────────────────────────────────────
-const MOUSE_SENS = 0.003; // sensibilidad mouse directa
+const MOUSE_SENS = 0.0018; // sensibilidad mouse (ajustable)
+let mouseVelX = 0;         // velocidad angular para suavizado
 
 function initControles() {
     document.addEventListener('keydown', e => {
@@ -437,43 +438,37 @@ function initControles() {
     });
     document.addEventListener('keyup', e => { keys[e.code]=false; });
 
-    // lookZone cubre todo el canvas en desktop y mitad derecha en móvil
-    const lz = document.getElementById('lookZone');
-
-    // Click en lookZone — capturar mouse
-    lz.addEventListener('click', () => {
-        if (!chatAbierto) canvas.requestPointerLock();
+    // Click en canvas — pedir pointer lock inmediatamente
+    canvas.addEventListener('click', () => {
+        if (!chatAbierto && document.pointerLockElement !== canvas)
+            canvas.requestPointerLock();
     });
 
     // Pointer lock change — feedback visual
     document.addEventListener('pointerlockchange', () => {
         const locked = document.pointerLockElement === canvas;
+        // Mostrar/ocultar crosshair según estado
         const ch = document.getElementById('crosshair');
-        if (ch) ch.style.opacity = locked ? '1' : '0.4';
+        if (ch) ch.style.opacity = locked ? '1' : '0.3';
     });
 
-    // Mouse move — rotación directa sin fricción
+    // Mouse move — rotación suave estilo Roblox
     document.addEventListener('mousemove', e => {
         if (document.pointerLockElement !== canvas || !vivo) return;
-        yo.angle += e.movementX * MOUSE_SENS;
+        // Acumular velocidad para suavizado
+        mouseVelX += e.movementX * MOUSE_SENS;
     });
 
-    // Click izquierdo — capturar o disparar
-    lz.addEventListener('mousedown', e => {
+    // Click izquierdo dispara (solo con pointer lock)
+    canvas.addEventListener('mousedown', e => {
         if (e.button === 0) {
             if (document.pointerLockElement !== canvas) {
                 canvas.requestPointerLock();
-            } else if (vivo) {
+            } else {
                 disparar();
             }
         }
     });
-
-    // Rueda del mouse — cambiar arma
-    lz.addEventListener('wheel', e => {
-        e.preventDefault();
-        cambiarArma();
-    }, { passive: false });
 
     initJoystick();
 }
@@ -490,6 +485,13 @@ function procesarInput(dt) {
     if (keys['ArrowLeft'])  yo.angle-=TURN_SPD;
     if (keys['ArrowRight']) yo.angle+=TURN_SPD;
 
+    // Aplicar rotación del mouse con suavizado (estilo Roblox)
+    if (mouseVelX !== 0) {
+        yo.angle += mouseVelX;
+        mouseVelX *= 0.75; // fricción — se detiene suavemente
+        if (Math.abs(mouseVelX) < 0.0001) mouseVelX = 0;
+    }
+
     if (joystick.active) {
         nx+=Math.cos(yo.angle)*(-joystick.y)*spd + Math.cos(yo.angle+HALF_PI)*joystick.x*spd;
         ny+=Math.sin(yo.angle)*(-joystick.y)*spd + Math.sin(yo.angle+HALF_PI)*joystick.x*spd;
@@ -499,7 +501,7 @@ function procesarInput(dt) {
     if (!colisiona(nx,yo.y,m)) yo.x=nx;
     if (!colisiona(yo.x,ny,m)) yo.y=ny;
 
-    if (keys['ControlLeft'] && vivo) disparar();
+    // Disparar con click izquierdo (manejado en mousedown del lookZone)
 
     // ── Salto ─────────────────────────────────────────────────────────────
     if ((keys['Space'] || keys['KeyF']) && !saltando) {
@@ -566,20 +568,31 @@ function actualizarBalas(dt) {
 // ── Pickups (colección visual en cliente) ─────────────────────────────────
 function comprobarPickups() {
     if (!vivo) return;
+    // Borrar localmente al recoger — no esperar confirmación del servidor
+    // Esto evita que los pickups se queden visibles después de recogerlos
     for (const id in monedas) {
         const m=monedas[id];
         const dx=m.x-yo.x,dy=m.y-yo.y;
-        if (Math.sqrt(dx*dx+dy*dy)<36) socket.emit('recoger_moneda',id);
+        if (Math.sqrt(dx*dx+dy*dy)<36) {
+            delete monedas[id];
+            socket.emit('recoger_moneda',id);
+        }
     }
     for (const id in corazones) {
         const h=corazones[id];
         const dx=h.x-yo.x,dy=h.y-yo.y;
-        if (Math.sqrt(dx*dx+dy*dy)<36) socket.emit('recoger_corazon',id);
+        if (Math.sqrt(dx*dx+dy*dy)<36) {
+            delete corazones[id];
+            socket.emit('recoger_corazon',id);
+        }
     }
     for (const id in ammoDrops) {
         const a=ammoDrops[id];
         const dx=a.x-yo.x,dy=a.y-yo.y;
-        if (Math.sqrt(dx*dx+dy*dy)<36) socket.emit('recoger_ammo',id);
+        if (Math.sqrt(dx*dx+dy*dy)<36) {
+            delete ammoDrops[id];
+            socket.emit('recoger_ammo',id);
+        }
     }
 }
 
@@ -777,15 +790,23 @@ function renderSprites() {
 
         } else if (sp.type==='moneda') {
             const csz=Math.max(4,Math.floor(sw*.8));
-            const cx2=Math.floor(scx),cy2=Math.floor(H/2+Math.sin(gameTime*3+sp.m.bob||0)*6);
+            const cx2=Math.floor(scx),cy2=Math.floor(H/2+Math.sin(gameTime*3+(sp.m.bob||0))*6);
             let vis=false;
             for (let c=cx2-csz/2;c<cx2+csz/2&&!vis;c++)if(c>=0&&c<W&&sp.dist<zBuffer[c])vis=true;
             if (!vis) continue;
+            // Moneda redonda con efecto de rotación
             const rot=Math.abs(Math.cos(gameTime*2.5+(sp.m.bob||0)));
-            const vw=Math.max(4,Math.floor(csz*rot));
+            const radio=Math.max(2,Math.floor(csz/2*rot));
             ctx.fillStyle='#ffd60a';
-            ctx.shadowColor='#ffd60a';ctx.shadowBlur=10;
-            ctx.fillRect(cx2-vw/2,cy2-csz/2,vw,csz);
+            ctx.shadowColor='#ffd60a';ctx.shadowBlur=12;
+            ctx.beginPath();
+            ctx.ellipse(cx2, cy2, radio, Math.floor(csz/2), 0, 0, TWO_PI);
+            ctx.fill();
+            // Brillo interior
+            ctx.fillStyle='#fff8a0';
+            ctx.beginPath();
+            ctx.ellipse(cx2-radio*0.2, cy2-Math.floor(csz/6), Math.max(1,radio*0.3), Math.max(1,Math.floor(csz/6)), 0, 0, TWO_PI);
+            ctx.fill();
             ctx.shadowBlur=0;
 
         } else if (sp.type==='corazon') {

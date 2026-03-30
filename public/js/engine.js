@@ -238,7 +238,7 @@ function spawnPickups(estado) {
         while (mapa.tiles[ty][tx] !== 0 && tries < 100);
         if (mapa.tiles[ty][tx] === 0)
             estado.coins.push({ id:`c${id++}`, x:tx*TILE+32, y:ty*TILE+32,
-                                valor:10+Math.floor(Math.random()*30), bob:Math.random()*6.28 });
+                                valor:3+Math.floor(Math.random()*6), bob:Math.random()*6.28 });
     }
     for (let i = 0; i < heartCount; i++) {
         let tx, ty, tries=0;
@@ -373,14 +373,14 @@ function updateBullets(estado, dt) {
                             const tirador = players.get(b.fromId);
                             if (tirador) {
                                 tirador.kills++;
-                                tirador.gold += 50 + level * 25;
+                                tirador.gold += 10 + level * 5;
                             }
                             // Notificar muerte del NPC al servidor para broadcast
                             if (estado.onMuerteNPC)
                                 estado.onMuerteNPC(e.id, b.fromId, tirador?.kills ?? 0);
                             // Spawn drops
                             estado.coins.push({ id:`dc_${Date.now()}`, x:e.x, y:e.y,
-                                valor:50+level*25, bob:Math.random()*6.28 });
+                                valor:10+level*5, bob:Math.random()*6.28 });
                             if (Math.random() < 0.3)
                                 estado.hearts.push({ id:`dh_${Date.now()}`, x:e.x, y:e.y,
                                     heal:25, bob:Math.random()*6.28 });
@@ -409,7 +409,7 @@ function updateBullets(estado, dt) {
                             boss.active = false;
                             // drops del jefe
                             for (let c=0;c<8;c++)
-                                estado.coins.push({id:`bdc_${c}`, x:boss.x+(Math.random()*100-50), y:boss.y+(Math.random()*100-50), valor:200, bob:0});
+                                estado.coins.push({id:`bdc_${c}`, x:boss.x+(Math.random()*100-50), y:boss.y+(Math.random()*100-50), valor:50, bob:0});
                             for (let h=0;h<3;h++)
                                 estado.hearts.push({id:`bdh_${h}`, x:boss.x+(Math.random()*60-30), y:boss.y+(Math.random()*60-30), heal:50, bob:0});
                             if (estado.onBossMuerto) estado.onBossMuerto();
