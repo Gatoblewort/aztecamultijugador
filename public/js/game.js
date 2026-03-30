@@ -422,14 +422,13 @@ function loop(ts) {
 }
 
 // ── Input ─────────────────────────────────────────────────────────────────
-const MOUSE_SENS = 0.0018; // sensibilidad mouse (ajustable)
-let mouseVelX = 0;         // velocidad angular para suavizado
+const MOUSE_SENS = 0.003; // sensibilidad mouse directa
 
 function initControles() {
     document.addEventListener('keydown', e => {
         if (chatAbierto) return;
         keys[e.code]=true;
-        if (e.code==='KeyQ') cambiarArma();
+        if (e.code==='KeyQ' || e.code==='Tab') { e.preventDefault(); cambiarArma(); }
         if (e.code==='KeyT') { e.preventDefault(); abrirChat(); }
         if (e.code==='Escape') {
             if (document.pointerLockElement===canvas) document.exitPointerLock();
@@ -438,37 +437,53 @@ function initControles() {
     });
     document.addEventListener('keyup', e => { keys[e.code]=false; });
 
-    // Click en canvas — pedir pointer lock inmediatamente
-    canvas.addEventListener('click', () => {
-        if (!chatAbierto && document.pointerLockElement !== canvas)
-            canvas.requestPointerLock();
+    // lookZone = div transparente encima del canvas
+    // En desktop cubre TODO, en móvil solo la mitad derecha
+    const lz = document.getElementById('lookZone');
+
+    // Click en lookZone — capturar mouse (pointer lock)
+    lz.addEventListener('click', () => {
+        if (!chatAbierto) canvas.requestPointerLock();
     });
 
-    // Pointer lock change — feedback visual
+    // Pointer lock — feedback en crosshair
     document.addEventListener('pointerlockchange', () => {
         const locked = document.pointerLockElement === canvas;
-        // Mostrar/ocultar crosshair según estado
         const ch = document.getElementById('crosshair');
-        if (ch) ch.style.opacity = locked ? '1' : '0.3';
+        if (ch) ch.style.opacity = locked ? '1' : '0.4';
     });
 
-    // Mouse move — rotación suave estilo Roblox
+    // Mouse move — rotación directa sin fricción
     document.addEventListener('mousemove', e => {
         if (document.pointerLockElement !== canvas || !vivo) return;
-        // Acumular velocidad para suavizado
-        mouseVelX += e.movementX * MOUSE_SENS;
+        yo.angle += e.movementX * MOUSE_SENS;
     });
 
-    // Click izquierdo dispara (solo con pointer lock)
-    canvas.addEventListener('mousedown', e => {
+    // Click izquierdo en lookZone — capturar O disparar
+    lz.addEventListener('mousedown', e => {
         if (e.button === 0) {
             if (document.pointerLockElement !== canvas) {
                 canvas.requestPointerLock();
-            } else {
+            } else if (vivo) {
                 disparar();
             }
         }
     });
+
+    // Backup: cualquier click izquierdo dispara si ya hay pointer lock
+    document.addEventListener('mousedown', e => {
+        if (e.button === 0 && document.pointerLockElement === canvas && vivo) {
+            disparar();
+        }
+    });
+
+    // Rueda del mouse — cambiar arma
+    document.addEventListener('wheel', e => {
+        if (document.pointerLockElement === canvas) {
+            e.preventDefault();
+            cambiarArma();
+        }
+    }, { passive: false });
 
     initJoystick();
 }
@@ -485,13 +500,6 @@ function procesarInput(dt) {
     if (keys['ArrowLeft'])  yo.angle-=TURN_SPD;
     if (keys['ArrowRight']) yo.angle+=TURN_SPD;
 
-    // Aplicar rotación del mouse con suavizado (estilo Roblox)
-    if (mouseVelX !== 0) {
-        yo.angle += mouseVelX;
-        mouseVelX *= 0.75; // fricción — se detiene suavemente
-        if (Math.abs(mouseVelX) < 0.0001) mouseVelX = 0;
-    }
-
     if (joystick.active) {
         nx+=Math.cos(yo.angle)*(-joystick.y)*spd + Math.cos(yo.angle+HALF_PI)*joystick.x*spd;
         ny+=Math.sin(yo.angle)*(-joystick.y)*spd + Math.sin(yo.angle+HALF_PI)*joystick.x*spd;
@@ -501,7 +509,7 @@ function procesarInput(dt) {
     if (!colisiona(nx,yo.y,m)) yo.x=nx;
     if (!colisiona(yo.x,ny,m)) yo.y=ny;
 
-    // Disparar con click izquierdo (manejado en mousedown del lookZone)
+    if (keys['ControlLeft'] && vivo) disparar();  // Ctrl también dispara
 
     // ── Salto ─────────────────────────────────────────────────────────────
     if ((keys['Space'] || keys['KeyF']) && !saltando) {
@@ -568,8 +576,6 @@ function actualizarBalas(dt) {
 // ── Pickups (colección visual en cliente) ─────────────────────────────────
 function comprobarPickups() {
     if (!vivo) return;
-    // Borrar localmente al recoger — no esperar confirmación del servidor
-    // Esto evita que los pickups se queden visibles después de recogerlos
     for (const id in monedas) {
         const m=monedas[id];
         const dx=m.x-yo.x,dy=m.y-yo.y;
@@ -794,18 +800,17 @@ function renderSprites() {
             let vis=false;
             for (let c=cx2-csz/2;c<cx2+csz/2&&!vis;c++)if(c>=0&&c<W&&sp.dist<zBuffer[c])vis=true;
             if (!vis) continue;
-            // Moneda redonda con efecto de rotación
             const rot=Math.abs(Math.cos(gameTime*2.5+(sp.m.bob||0)));
-            const radio=Math.max(2,Math.floor(csz/2*rot));
+            const radioX=Math.max(2,Math.floor(csz/2*rot));
+            const radioY=Math.max(2,Math.floor(csz/2));
             ctx.fillStyle='#ffd60a';
             ctx.shadowColor='#ffd60a';ctx.shadowBlur=12;
             ctx.beginPath();
-            ctx.ellipse(cx2, cy2, radio, Math.floor(csz/2), 0, 0, TWO_PI);
+            ctx.ellipse(cx2,cy2,radioX,radioY,0,0,TWO_PI);
             ctx.fill();
-            // Brillo interior
-            ctx.fillStyle='#fff8a0';
+            ctx.fillStyle='rgba(255,255,180,0.6)';
             ctx.beginPath();
-            ctx.ellipse(cx2-radio*0.2, cy2-Math.floor(csz/6), Math.max(1,radio*0.3), Math.max(1,Math.floor(csz/6)), 0, 0, TWO_PI);
+            ctx.ellipse(cx2-radioX*0.2,cy2-radioY*0.3,Math.max(1,radioX*0.3),Math.max(1,radioY*0.3),0,0,TWO_PI);
             ctx.fill();
             ctx.shadowBlur=0;
 
