@@ -89,12 +89,6 @@ window.addEventListener('load', () => {
 
     conectarSocket(token, datos.salaId);
     initControles();
-    // Iniciar sonido al primer click del usuario
-    document.addEventListener('click', () => {
-        SOUND.init();
-        SOUND.reanudar();
-        SOUND.iniciarMusica();
-    }, { once: true });
     requestAnimationFrame(loop);
 });
 
@@ -259,7 +253,6 @@ function conectarSocket(token, salaId) {
         if (jugadores[id]) jugadores[id].hp=hp;
         if (id===miId) {
             yo.hp=hp; actualizarHP(); flashDanio();
-            SOUND.danio();
         }
     });
 
@@ -271,7 +264,6 @@ function conectarSocket(token, salaId) {
 
         // Si es NPC, eliminarlo del objeto después de 800ms (pequeño delay visual)
         if (esNPCmuerto) {
-            SOUND.muerteNPC();
             setTimeout(() => { delete jugadores[id]; delete interpBuffers[id]; }, 800);
         }
         const nombreVictima = jugadores[id]?.nombre || (esNPCmuerto ? 'Conquistador' : id);
@@ -286,7 +278,7 @@ function conectarSocket(token, salaId) {
         }
 
         // Solo activar respawn si NOSOTROS morimos
-        if (id === miId) { vivo = false; SOUND.muerteJugador(); mostrarRespawn(5); }
+        if (id === miId) { vivo = false; mostrarRespawn(5); }
     });
 
     socket.on('jugador_respawn', ({id,x,y,hp}) => {
@@ -294,7 +286,6 @@ function conectarSocket(token, salaId) {
         jugadores[id].x=x; jugadores[id].y=y; jugadores[id].hp=hp; jugadores[id].vivo=true;
         if (id===miId) {
             yo.x=x; yo.y=y; yo.hp=hp; vivo=true;
-            SOUND.respawn();
             document.getElementById('respawnOverlay').style.display='none';
             actualizarHP();
         }
@@ -425,28 +416,19 @@ function loop(ts) {
     actualizarBalas(dt);
     actualizarParticulas(dt);
     comprobarPickups();
-    // Pasos al moverse
-    if (yo && vivo) {
-        const moviendose = keys['KeyW']||keys['KeyS']||keys['KeyA']||keys['KeyD']||
-                           keys['ArrowUp']||keys['ArrowDown']||joystick.active;
-        SOUND.iniciarPasos(moviendose);
-    }
-    // Sonido del jefe
-    if (bossData && bossData.active) SOUND.tickJefe(gameTime);
     try { render(); } catch(e) { console.warn('render error:', e.message); }
     try { renderMinimap(); } catch(e) { console.warn('minimap error:', e.message); }
     requestAnimationFrame(loop);
 }
 
 // ── Input ─────────────────────────────────────────────────────────────────
-const MOUSE_SENS = 0.0018; // sensibilidad mouse (ajustable)
-let mouseVelX = 0;         // velocidad angular para suavizado
+const MOUSE_SENS = 0.003; // sensibilidad mouse directa
 
 function initControles() {
     document.addEventListener('keydown', e => {
         if (chatAbierto) return;
         keys[e.code]=true;
-        if (e.code==='KeyQ') cambiarArma();
+        if (e.code==='KeyQ' || e.code==='Tab') { e.preventDefault(); cambiarArma(); }
         if (e.code==='KeyT') { e.preventDefault(); abrirChat(); }
         if (e.code==='Escape') {
             if (document.pointerLockElement===canvas) document.exitPointerLock();
@@ -455,37 +437,53 @@ function initControles() {
     });
     document.addEventListener('keyup', e => { keys[e.code]=false; });
 
-    // Click en canvas — pedir pointer lock inmediatamente
-    canvas.addEventListener('click', () => {
-        if (!chatAbierto && document.pointerLockElement !== canvas)
-            canvas.requestPointerLock();
+    // lookZone = div transparente encima del canvas
+    // En desktop cubre TODO, en móvil solo la mitad derecha
+    const lz = document.getElementById('lookZone');
+
+    // Click en lookZone — capturar mouse (pointer lock)
+    lz.addEventListener('click', () => {
+        if (!chatAbierto) canvas.requestPointerLock();
     });
 
-    // Pointer lock change — feedback visual
+    // Pointer lock — feedback en crosshair
     document.addEventListener('pointerlockchange', () => {
         const locked = document.pointerLockElement === canvas;
-        // Mostrar/ocultar crosshair según estado
         const ch = document.getElementById('crosshair');
-        if (ch) ch.style.opacity = locked ? '1' : '0.3';
+        if (ch) ch.style.opacity = locked ? '1' : '0.4';
     });
 
-    // Mouse move — rotación suave estilo Roblox
+    // Mouse move — rotación directa sin fricción
     document.addEventListener('mousemove', e => {
         if (document.pointerLockElement !== canvas || !vivo) return;
-        // Acumular velocidad para suavizado
-        mouseVelX += e.movementX * MOUSE_SENS;
+        yo.angle += e.movementX * MOUSE_SENS;
     });
 
-    // Click izquierdo dispara (solo con pointer lock)
-    canvas.addEventListener('mousedown', e => {
+    // Click izquierdo en lookZone — capturar O disparar
+    lz.addEventListener('mousedown', e => {
         if (e.button === 0) {
             if (document.pointerLockElement !== canvas) {
                 canvas.requestPointerLock();
-            } else {
+            } else if (vivo) {
                 disparar();
             }
         }
     });
+
+    // Backup: cualquier click izquierdo dispara si ya hay pointer lock
+    document.addEventListener('mousedown', e => {
+        if (e.button === 0 && document.pointerLockElement === canvas && vivo) {
+            disparar();
+        }
+    });
+
+    // Rueda del mouse — cambiar arma
+    document.addEventListener('wheel', e => {
+        if (document.pointerLockElement === canvas) {
+            e.preventDefault();
+            cambiarArma();
+        }
+    }, { passive: false });
 
     initJoystick();
 }
@@ -502,13 +500,6 @@ function procesarInput(dt) {
     if (keys['ArrowLeft'])  yo.angle-=TURN_SPD;
     if (keys['ArrowRight']) yo.angle+=TURN_SPD;
 
-    // Aplicar rotación del mouse con suavizado (estilo Roblox)
-    if (mouseVelX !== 0) {
-        yo.angle += mouseVelX;
-        mouseVelX *= 0.75; // fricción — se detiene suavemente
-        if (Math.abs(mouseVelX) < 0.0001) mouseVelX = 0;
-    }
-
     if (joystick.active) {
         nx+=Math.cos(yo.angle)*(-joystick.y)*spd + Math.cos(yo.angle+HALF_PI)*joystick.x*spd;
         ny+=Math.sin(yo.angle)*(-joystick.y)*spd + Math.sin(yo.angle+HALF_PI)*joystick.x*spd;
@@ -518,7 +509,7 @@ function procesarInput(dt) {
     if (!colisiona(nx,yo.y,m)) yo.x=nx;
     if (!colisiona(yo.x,ny,m)) yo.y=ny;
 
-    if (keys['ControlLeft'] && vivo) disparar();
+    if (keys['ControlLeft'] && vivo) disparar();  // Ctrl también dispara
 
     // ── Salto ─────────────────────────────────────────────────────────────
     if ((keys['Space'] || keys['KeyF']) && !saltando) {
@@ -549,7 +540,6 @@ function disparar() {
     const arma=ARMAS[armaActual];
     if (now-lastShot<arma.cooldown) return;
     lastShot=now;
-    SOUND.disparo(armaActual);
     const dx=Math.cos(yo.angle)*BULLET_SPD;
     const dy=Math.sin(yo.angle)*BULLET_SPD;
     spawnParticula(yo.x+Math.cos(yo.angle)*30,yo.y+Math.sin(yo.angle)*30,255,200,80,8);
@@ -589,17 +579,26 @@ function comprobarPickups() {
     for (const id in monedas) {
         const m=monedas[id];
         const dx=m.x-yo.x,dy=m.y-yo.y;
-        if (Math.sqrt(dx*dx+dy*dy)<36) socket.emit('recoger_moneda',id);
+        if (Math.sqrt(dx*dx+dy*dy)<36) {
+            delete monedas[id];
+            socket.emit('recoger_moneda',id);
+        }
     }
     for (const id in corazones) {
         const h=corazones[id];
         const dx=h.x-yo.x,dy=h.y-yo.y;
-        if (Math.sqrt(dx*dx+dy*dy)<36) socket.emit('recoger_corazon',id);
+        if (Math.sqrt(dx*dx+dy*dy)<36) {
+            delete corazones[id];
+            socket.emit('recoger_corazon',id);
+        }
     }
     for (const id in ammoDrops) {
         const a=ammoDrops[id];
         const dx=a.x-yo.x,dy=a.y-yo.y;
-        if (Math.sqrt(dx*dx+dy*dy)<36) socket.emit('recoger_ammo',id);
+        if (Math.sqrt(dx*dx+dy*dy)<36) {
+            delete ammoDrops[id];
+            socket.emit('recoger_ammo',id);
+        }
     }
 }
 
@@ -796,46 +795,119 @@ function renderSprites() {
             }
 
         } else if (sp.type==='moneda') {
-            const csz=Math.max(4,Math.floor(sw*.8));
-            const cx2=Math.floor(scx),cy2=Math.floor(H/2+Math.sin(gameTime*3+sp.m.bob||0)*6);
+            // Moneda pixel art circular estilo Mario — pequeña y redonda
+            const csz=Math.max(4,Math.floor(sw*.32)); // bien pequeña
+            const bob=Math.sin(gameTime*4+(sp.m.bob||0))*3;
+            const cx2=Math.floor(scx), cy2=Math.floor(H/2+bob);
             let vis=false;
-            for (let c=cx2-csz/2;c<cx2+csz/2&&!vis;c++)if(c>=0&&c<W&&sp.dist<zBuffer[c])vis=true;
-            if (!vis) continue;
-            const rot=Math.abs(Math.cos(gameTime*2.5+(sp.m.bob||0)));
-            const vw=Math.max(4,Math.floor(csz*rot));
-            ctx.fillStyle='#ffd60a';
-            ctx.shadowColor='#ffd60a';ctx.shadowBlur=10;
-            ctx.fillRect(cx2-vw/2,cy2-csz/2,vw,csz);
+            for(let c=cx2-csz;c<cx2+csz&&!vis;c++)if(c>=0&&c<W&&sp.dist<zBuffer[c])vis=true;
+            if(!vis) continue;
+            // Efecto giro: aplanar en X como moneda girando
+            const giro=Math.abs(Math.cos(gameTime*3+(sp.m.bob||0)));
+            const px=Math.max(1,Math.floor(csz/7)); // tamaño de cada píxel del grid
+            // Grid 7×7 circular (0=vacío, 1=borde oscuro, 2=dorado, 3=brillo)
+            const cmap=[
+                [0,0,1,1,1,0,0],
+                [0,1,2,2,2,1,0],
+                [1,2,3,2,2,2,1],
+                [1,2,3,2,2,2,1],
+                [1,2,2,2,2,2,1],
+                [0,1,2,2,2,1,0],
+                [0,0,1,1,1,0,0],
+            ];
+            ctx.imageSmoothingEnabled=false;
+            ctx.shadowColor='#ffd60a'; ctx.shadowBlur=5;
+            const anchoGiro=Math.max(1,Math.floor(7*px*giro));
+            const offX=cx2-Math.floor(anchoGiro/2);
+            const oy2=cy2-Math.floor(7*px/2);
+            for(let row=0;row<7;row++){
+                for(let col=0;col<7;col++){
+                    const v=cmap[row][col];
+                    if(!v) continue;
+                    const x0=offX+Math.floor(col*anchoGiro/7);
+                    const x1=offX+Math.floor((col+1)*anchoGiro/7);
+                    const wd=Math.max(1,x1-x0);
+                    ctx.fillStyle=v===3?'#fff5a0':v===2?'#f5c400':'#8a5c00';
+                    ctx.fillRect(x0, oy2+row*px, wd, px);
+                }
+            }
             ctx.shadowBlur=0;
+            ctx.imageSmoothingEnabled=true;
 
         } else if (sp.type==='corazon') {
-            const hsz=Math.max(6,Math.floor(sw*.7));
-            const cx2=Math.floor(scx),cy2=Math.floor(H/2+Math.sin(gameTime*2.5+(sp.h.bob||0))*6);
+            // Corazón pixel art — forma clásica de corazón en cuadrícula
+            const hsz=Math.max(8,Math.floor(sw*.65));
+            const bob=Math.sin(gameTime*2.5+(sp.h.bob||0))*5;
+            const cx2=Math.floor(scx), cy2=Math.floor(H/2+bob);
             let vis=false;
-            for(let c=cx2-hsz/2;c<cx2+hsz/2&&!vis;c++)if(c>=0&&c<W&&sp.dist<zBuffer[c])vis=true;
-            if (!vis) continue;
-            // Dibujar corazón como pixel art
-            ctx.fillStyle=`rgb(220,50,80)`;
-            ctx.shadowColor='#ff4466';ctx.shadowBlur=8;
-            ctx.fillRect(cx2-hsz/2,cy2-hsz/4,hsz/2,hsz/2);
-            ctx.fillRect(cx2,cy2-hsz/4,hsz/2,hsz/2);
-            ctx.fillRect(cx2-hsz/2,cy2,hsz,hsz/2);
-            for(let row=0;row<hsz/4;row++){const w2=hsz-row*2;ctx.fillRect(cx2-w2/2,cy2+hsz/2+row,w2,1);}
+            for(let c=cx2-hsz;c<cx2+hsz&&!vis;c++)if(c>=0&&c<W&&sp.dist<zBuffer[c])vis=true;
+            if(!vis) continue;
+            const p=Math.max(1,Math.floor(hsz/8)); // tamaño de cada píxel
+            // pulso de escala suave
+            const pulso=1+0.12*Math.sin(gameTime*4+(sp.h.bob||0));
+            const s=Math.floor(hsz*pulso);
+            const ox=cx2-Math.floor(s/2), oy=cy2-Math.floor(s/2);
+            ctx.imageSmoothingEnabled=false;
+            // Mapa de píxeles del corazón (8×8 grid, 0=vacío 1=rojo 2=claro)
+            // Clásica forma de corazón pixel art
+            const px=Math.max(1,Math.floor(s/8));
+            const hmap=[
+                [0,1,1,0,0,1,1,0],
+                [1,2,1,1,1,1,2,1],
+                [1,2,2,1,1,2,2,1],
+                [1,1,1,1,1,1,1,1],
+                [0,1,1,1,1,1,1,0],
+                [0,0,1,1,1,1,0,0],
+                [0,0,0,1,1,0,0,0],
+                [0,0,0,0,0,0,0,0],
+            ];
+            ctx.shadowColor='#ff4466'; ctx.shadowBlur=10;
+            for(let row=0;row<8;row++){
+                for(let col=0;col<8;col++){
+                    const v=hmap[row][col];
+                    if(!v) continue;
+                    ctx.fillStyle=v===2?'#ff8899':'#dd1144';
+                    ctx.fillRect(ox+col*px, oy+row*px, px, px);
+                }
+            }
             ctx.shadowBlur=0;
+            ctx.imageSmoothingEnabled=true;
 
         } else if (sp.type==='ammo') {
-            const asz=Math.max(6,Math.floor(sw*.75));
-            const cx2=Math.floor(scx),cy2=Math.floor(H/2+Math.sin(gameTime*3.5+(sp.a.bob||0))*5);
+            // Munición pixel art — pequeña, grid 5×9 un solo cartucho
+            const asz=Math.max(4,Math.floor(sw*.28)); // muy pequeña
+            const bob=Math.sin(gameTime*3.5+(sp.a.bob||0))*3;
+            const cx2=Math.floor(scx), cy2=Math.floor(H/2+bob);
             let vis=false;
-            for(let c=cx2-asz/2;c<cx2+asz/2&&!vis;c++)if(c>=0&&c<W&&sp.dist<zBuffer[c])vis=true;
-            if (!vis) continue;
-            const pulse=.7+.3*Math.sin(gameTime*4+(sp.a.bob||0));
-            ctx.fillStyle=`rgba(80,200,255,${pulse})`;
-            ctx.shadowColor='#50c8ff';ctx.shadowBlur=8;
-            ctx.fillRect(cx2-asz/4,cy2-asz/2,asz/2,asz);
-            ctx.fillStyle=`rgba(40,120,200,${pulse})`;
-            ctx.fillRect(cx2-asz/6,cy2-asz/2-asz/4,asz/3,asz/4);
+            for(let c=cx2-asz;c<cx2+asz&&!vis;c++)if(c>=0&&c<W&&sp.dist<zBuffer[c])vis=true;
+            if(!vis) continue;
+            ctx.imageSmoothingEnabled=false;
+            const p=Math.max(1,Math.floor(asz/5)); // tamaño de cada píxel
+            // Grid 5 cols × 9 filas (0=vacío, 1=plomo, 2=bronce, 3=brillo, 4=base oscura)
+            const amap=[
+                [0,1,1,1,0],
+                [0,1,3,1,0],
+                [1,2,3,2,1],
+                [1,2,3,2,1],
+                [1,2,2,2,1],
+                [1,2,2,2,1],
+                [1,2,2,2,1],
+                [1,2,2,2,1],
+                [1,4,4,4,1],
+            ];
+            const ox2=cx2-Math.floor(5*p/2);
+            const oy3=cy2-Math.floor(9*p/2);
+            ctx.shadowColor='#c87010'; ctx.shadowBlur=4;
+            for(let row=0;row<9;row++){
+                for(let col=0;col<5;col++){
+                    const v=amap[row][col];
+                    if(!v) continue;
+                    ctx.fillStyle=v===1?'#b0b5b8':v===2?'#c87010':v===3?'#e8c060':'#3a1800';
+                    ctx.fillRect(ox2+col*p, oy3+row*p, p, p);
+                }
+            }
             ctx.shadowBlur=0;
+            ctx.imageSmoothingEnabled=true;
         }
     }
 }
