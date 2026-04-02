@@ -17,7 +17,7 @@ const PLAYER_SPEED  = 3.8;
 
 const WEAPON_COOLDOWN  = [0.15, 0.25, 0.40];
 const WEAPON_DAMAGE    = [15,   25,   40  ];
-const WEAPON_BULL_SPD  = [12,   14,   18  ];
+const WEAPON_BULL_SPD  = [18,   22,   28  ];  // más rápidas — menos delay percibido
 const WEAPON_NAMES     = ['Macuahuitl', 'Atlatl', 'Arco'];
 
 // Estados IA — mismo enum que el .c
@@ -422,7 +422,7 @@ function updateBullets(estado, dt) {
                 if (!hit) {
                     for (const [sid, target] of players) {
                         if (sid === b.fromId || !target.vivo) continue;
-                        if (dist(b.x,b.y,target.x,target.y) < 28) {
+                        if (dist(b.x,b.y,target.x,target.y) < 32) {
                             let dmgReal = b.danio;
                             if (level === 3) dmgReal = Math.floor(dmgReal * 0.6); // reducción nivel 3
                             target.hp -= dmgReal;
@@ -450,7 +450,7 @@ function updateBullets(estado, dt) {
                         let dmgReal = b.danio;
                         if (level === 3) dmgReal = Math.floor(dmgReal * 0.6);
                         target.hp -= dmgReal;
-                        target.invulTime = 1.2;
+                        target.invulTime = 0.3;  // reducido para respuesta inmediata
                         hit = true;
                         b.active = false;
                         if (estado.onDanioJugador)
@@ -543,7 +543,7 @@ function updateBoss(estado, dt) {
         if (!p.vivo || p.invulTime > 0) continue;
         if (nearDist < 60) {
             const dmg = boss.phase===2 ? 5 : 3;
-            p.hp -= dmg; p.invulTime = 1.0;
+            p.hp -= dmg; p.invulTime = 0.3;
             if (estado.onDanioJugador) estado.onDanioJugador(sid, p.hp, 'boss', dmg);
             if (p.hp <= 0) {
                 p.vivo=false; p.muertes++;
