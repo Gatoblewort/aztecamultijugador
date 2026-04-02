@@ -250,6 +250,10 @@ function conectarSocket(token, salaId) {
 
     socket.on('bala_creada', bala => {
         balas[bala.id]={...bala,localLife:bala.vida||2.5};
+        // Sincronizar flash de disparo con el momento exacto del disparo del NPC
+        if (!bala.deJugador && bala.fromId && jugadores[bala.fromId]) {
+            jugadores[bala.fromId]._flashTs = Date.now();
+        }
     });
 
     socket.on('jugador_recibio_danio', ({id,hp,fromId,danio}) => {
@@ -816,7 +820,7 @@ function renderSprites() {
             // Usar skins.js para dibujar el personaje
             ctx.save();
             try {
-                dibujarSkin(ctx, sp.j.skin||'guerrero_base', drawX, Math.floor(drawY), iw, ih, gameTime, bright, {aiEstado:sp.j.estado});
+                dibujarSkin(ctx, sp.j.skin||'guerrero_base', drawX, Math.floor(drawY), iw, ih, gameTime, bright, {aiEstado:sp.j.estado, flashTs:sp.j._flashTs||0});
             } catch(e) { console.warn('skin draw error:', e.message); }
             ctx.restore();
 
