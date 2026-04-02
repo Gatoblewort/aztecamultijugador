@@ -34,92 +34,245 @@ SKINS.conquistador = {
 
     draw(ctx, x, y, w, h, t, bright, aiEstado) {
         const br = bright;
-        const walk = Math.sin(t * 8) * h * 0.05; // animación de caminar
+        const isShooting = aiEstado === 'shoot' || aiEstado === 'strafe' || aiEstado === 'retreat' || aiEstado === 'boss';
+        const walk = Math.sin(t * 8) * h * 0.05;
 
-        // Sombra
-        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        // ── Sombra ────────────────────────────────────────────────────────
+        ctx.fillStyle = 'rgba(0,0,0,0.35)';
         ctx.beginPath();
-        ctx.ellipse(x+w/2, y+h, w*0.3, h*0.04, 0, 0, Math.PI*2);
+        ctx.ellipse(x+w/2, y+h*0.99, w*0.32, h*0.035, 0, 0, Math.PI*2);
         ctx.fill();
 
-        // Capa roja (detrás del cuerpo)
-        ctx.fillStyle = C(180,20,20, br);
-        ctx.fillRect(x+w*0.10, y+h*0.28, w*0.80, h*0.55);
-
-        // Piernas con armadura
-        ctx.fillStyle = C(160,165,175, br);
-        ctx.fillRect(x+w*0.20, y+h*0.65, w*0.25, h*0.30+walk);
-        ctx.fillRect(x+w*0.55, y+h*0.65, w*0.25, h*0.30-walk);
-
-        // Botas oscuras
-        ctx.fillStyle = C(40,30,25, br);
-        ctx.fillRect(x+w*0.20, y+h*0.87+walk,  w*0.25, h*0.08);
-        ctx.fillRect(x+w*0.55, y+h*0.87-walk, w*0.25, h*0.08);
-
-        // Torso — peto de armadura
-        ctx.fillStyle = C(160,165,175, br);
-        ctx.fillRect(x+w*0.22, y+h*0.30, w*0.56, h*0.35);
-
-        // Detalle central del peto
-        ctx.fillStyle = C(100,105,115, br);
-        ctx.fillRect(x+w*0.47, y+h*0.32, w*0.06, h*0.30);
-
-        // Hombros (pauldrons)
-        ctx.fillStyle = C(160,165,175, br);
-        ctx.fillRect(x+w*0.06, y+h*0.28, w*0.18, h*0.12);
-        ctx.fillRect(x+w*0.76, y+h*0.28, w*0.18, h*0.12);
-
-        // Brazos
-        ctx.fillRect(x+w*0.04, y+h*0.35, w*0.15, h*0.28);
-        ctx.fillRect(x+w*0.81, y+h*0.35, w*0.15, h*0.28);
-
-        // Escudo circular izquierdo
-        ctx.fillStyle = C(160,130,60, br);
-        const shR = Math.floor(w*0.15);
-        const shCX = Math.floor(x+w*0.06), shCY = Math.floor(y+h*0.48);
+        // ── ESCUDO (izquierda, detrás del brazo) ──────────────────────────
+        // Base del escudo — madera dorada
+        ctx.fillStyle = C(160,128,55, br);
+        const shR = w*0.16;
+        const shCX = x+w*0.10, shCY = y+h*0.50;
         ctx.beginPath();
         ctx.arc(shCX, shCY, shR, 0, Math.PI*2);
         ctx.fill();
-        // Cruz en el escudo
-        ctx.fillStyle = C(200,20,20, br);
-        ctx.fillRect(shCX-shR/2, shCY-shR/4, shR, shR/3);
-        ctx.fillRect(shCX-shR/4, shCY-shR/2, shR/3, shR);
+        // Borde metálico del escudo
+        ctx.strokeStyle = C(130,135,145, br);
+        ctx.lineWidth = Math.max(1, w*0.025);
+        ctx.beginPath();
+        ctx.arc(shCX, shCY, shR, 0, Math.PI*2);
+        ctx.stroke();
+        // Cruz roja en el escudo
+        ctx.fillStyle = C(190,18,18, br);
+        ctx.fillRect(shCX-shR*0.55, shCY-shR*0.18, shR*1.1, shR*0.36);
+        ctx.fillRect(shCX-shR*0.18, shCY-shR*0.55, shR*0.36, shR*1.1);
+        // Brillo del escudo
+        ctx.fillStyle = C(200,205,215, br*0.4);
+        ctx.fillRect(shCX-shR*0.3, shCY-shR*0.7, shR*0.15, shR*0.4);
 
-        // Espada derecha (solo si en alerta)
-        if (aiEstado && aiEstado !== 'patrol') {
-            ctx.fillStyle = C(210,215,220, br);
-            const swX = Math.floor(x+w*0.84);
-            ctx.fillRect(swX, y+h*0.18, w*0.08, h*0.48);
-            ctx.fillStyle = C(180,150,40, br);
-            ctx.fillRect(swX-w*0.04, y+h*0.34, w*0.18, h*0.04);
+        // ── PIERNAS con armadura articulada ───────────────────────────────
+        // Muslos
+        ctx.fillStyle = C(148,153,163, br);
+        ctx.fillRect(x+w*0.22, y+h*0.63, w*0.24, h*0.18+walk);
+        ctx.fillRect(x+w*0.54, y+h*0.63, w*0.24, h*0.18-walk);
+        // Rodilleras — más oscuras
+        ctx.fillStyle = C(110,115,125, br);
+        ctx.fillRect(x+w*0.22, y+h*0.79+walk*0.5, w*0.24, h*0.06);
+        ctx.fillRect(x+w*0.54, y+h*0.79-walk*0.5, w*0.24, h*0.06);
+        // Espinillas
+        ctx.fillStyle = C(148,153,163, br);
+        ctx.fillRect(x+w*0.23, y+h*0.84+walk, w*0.22, h*0.10);
+        ctx.fillRect(x+w*0.55, y+h*0.84-walk, w*0.22, h*0.10);
+        // Botas de cuero oscuro
+        ctx.fillStyle = C(68,48,32, br);
+        ctx.fillRect(x+w*0.20, y+h*0.92+walk, w*0.26, h*0.07);
+        ctx.fillRect(x+w*0.54, y+h*0.92-walk, w*0.26, h*0.07);
+        // Suela de bota
+        ctx.fillStyle = C(40,28,18, br);
+        ctx.fillRect(x+w*0.19, y+h*0.97+walk, w*0.28, h*0.025);
+        ctx.fillRect(x+w*0.53, y+h*0.97-walk, w*0.28, h*0.025);
+
+        // ── TORSO principal — peto plateado ──────────────────────────────
+        // Base del peto
+        ctx.fillStyle = C(155,160,170, br);
+        ctx.fillRect(x+w*0.24, y+h*0.30, w*0.52, h*0.34);
+        // Línea central del peto (rebaje)
+        ctx.fillStyle = C(105,110,120, br);
+        ctx.fillRect(x+w*0.47, y+h*0.31, w*0.06, h*0.32);
+        // Fajas horizontales del peto
+        ctx.fillStyle = C(120,125,135, br);
+        ctx.fillRect(x+w*0.24, y+h*0.44, w*0.52, h*0.025);
+        ctx.fillRect(x+w*0.24, y+h*0.55, w*0.52, h*0.025);
+        // Brillo del peto (lado izquierdo)
+        ctx.fillStyle = C(195,200,210, br*0.6);
+        ctx.fillRect(x+w*0.25, y+h*0.31, w*0.08, h*0.30);
+
+        // ── CRUZ ROJA en el peto ──────────────────────────────────────────
+        ctx.fillStyle = C(190,18,18, br);
+        // Barra horizontal de la cruz
+        ctx.fillRect(x+w*0.30, y+h*0.36, w*0.40, h*0.10);
+        // Barra vertical de la cruz
+        ctx.fillRect(x+w*0.44, y+h*0.31, w*0.12, h*0.26);
+
+        // ── HOMBROS (pauldrons) ───────────────────────────────────────────
+        // Hombro izquierdo (con escudo)
+        ctx.fillStyle = C(148,153,163, br);
+        ctx.fillRect(x+w*0.08, y+h*0.27, w*0.19, h*0.11);
+        ctx.fillRect(x+w*0.09, y+h*0.36, w*0.16, h*0.08);
+        // Hombro derecho (con pistola)
+        ctx.fillRect(x+w*0.73, y+h*0.27, w*0.19, h*0.11);
+        ctx.fillRect(x+w*0.75, y+h*0.36, w*0.16, h*0.08);
+        // Remaches de los hombros
+        ctx.fillStyle = C(180,185,195, br);
+        ctx.fillRect(x+w*0.12, y+h*0.29, w*0.04, h*0.03);
+        ctx.fillRect(x+w*0.80, y+h*0.29, w*0.04, h*0.03);
+
+        // ── BRAZO IZQUIERDO (sostiene escudo) ────────────────────────────
+        ctx.fillStyle = C(148,153,163, br);
+        ctx.fillRect(x+w*0.06, y+h*0.36, w*0.14, h*0.26);
+        // Coderas
+        ctx.fillStyle = C(110,115,125, br);
+        ctx.fillRect(x+w*0.05, y+h*0.47, w*0.16, h*0.05);
+
+        // ── BRAZO DERECHO (sostiene pistola) ─────────────────────────────
+        ctx.fillStyle = C(148,153,163, br);
+        // Brazo extendido hacia adelante (izquierda en pantalla = hacia el enemigo)
+        ctx.fillRect(x+w*0.80, y+h*0.36, w*0.14, h*0.26);
+        // Codera derecha
+        ctx.fillStyle = C(110,115,125, br);
+        ctx.fillRect(x+w*0.79, y+h*0.47, w*0.16, h*0.05);
+        // Mano/guantelete
+        ctx.fillStyle = C(100,105,115, br);
+        ctx.fillRect(x+w*0.80, y+h*0.60, w*0.14, h*0.07);
+
+        // ── PISTOLA / ARCABUZ ─────────────────────────────────────────────
+        // Mango de madera
+        ctx.fillStyle = C(90,55,25, br);
+        ctx.fillRect(x+w*0.82, y+h*0.58, w*0.08, h*0.14);
+        // Cuerpo del arma (horizontal, apunta a la izquierda)
+        ctx.fillStyle = C(55,55,60, br);
+        ctx.fillRect(x-w*0.04, y+h*0.58, w*0.88, h*0.07);
+        // Cañón (tubo más oscuro)
+        ctx.fillStyle = C(35,35,40, br);
+        ctx.fillRect(x-w*0.08, y+h*0.595, w*0.40, h*0.04);
+        // Boca del cañón (extremo)
+        ctx.fillStyle = C(20,20,25, br);
+        ctx.fillRect(x-w*0.10, y+h*0.585, w*0.07, h*0.06);
+        // Gatillo
+        ctx.fillStyle = C(80,80,85, br);
+        ctx.fillRect(x+w*0.78, y+h*0.65, w*0.04, h*0.06);
+        // Mecanismo de llave
+        ctx.fillStyle = C(160,130,50, br);
+        ctx.fillRect(x+w*0.68, y+h*0.58, w*0.10, h*0.05);
+
+        // ── FLASH DE DISPARO animado ──────────────────────────────────────
+        if (isShooting) {
+            const flashT = (t * 12) % 1; // ciclo rápido
+            const flashAlpha = flashT < 0.5 ? flashT * 2 : (1 - flashT) * 2;
+            if (flashAlpha > 0.1) {
+                const fx = x - w*0.10; // boca del cañón
+                const fy = y + h*0.605;
+                ctx.save();
+                // Destello central blanco-amarillo
+                ctx.globalAlpha = flashAlpha * br;
+                ctx.fillStyle = `rgb(255,240,180)`;
+                ctx.beginPath();
+                ctx.arc(fx, fy, w*0.08, 0, Math.PI*2);
+                ctx.fill();
+                // Rayos del destello — 8 puntas irregulares
+                const rayos = [
+                    [-0.28, -0.02, 0.10, 0.03],  // izquierda largo
+                    [-0.20, -0.08, 0.07, 0.025],  // izq-arriba
+                    [-0.18,  0.06, 0.07, 0.025],  // izq-abajo
+                    [-0.14, -0.13, 0.05, 0.02],   // arriba-izq
+                    [-0.14,  0.11, 0.05, 0.02],   // abajo-izq
+                    [ 0.00, -0.14, 0.04, 0.02],   // arriba
+                    [ 0.00,  0.14, 0.04, 0.02],   // abajo
+                    [ 0.06, -0.05, 0.03, 0.015],  // derecha corto
+                ];
+                rayos.forEach(([dx, dy, len, ww]) => {
+                    const angle = Math.atan2(dy, dx);
+                    const dist  = Math.sqrt(dx*dx+dy*dy)*w;
+                    ctx.save();
+                    ctx.translate(fx + dx*w, fy + dy*w);
+                    ctx.rotate(angle);
+                    // Naranja exterior
+                    ctx.fillStyle = `rgb(${Math.floor(255*flashAlpha)},${Math.floor(110*flashAlpha)},0)`;
+                    ctx.fillRect(0, -ww*w, len*w*1.4, ww*w*2);
+                    // Amarillo interior
+                    ctx.fillStyle = `rgb(255,${Math.floor(220*flashAlpha)},80)`;
+                    ctx.fillRect(0, -ww*w*0.5, len*w, ww*w);
+                    ctx.restore();
+                });
+                // Núcleo blanco brillante
+                ctx.fillStyle = `rgb(255,255,220)`;
+                ctx.beginPath();
+                ctx.arc(fx, fy, w*0.045, 0, Math.PI*2);
+                ctx.fill();
+                ctx.restore();
+            }
         }
 
-        // Gorguera (cuello)
-        ctx.fillStyle = C(160,165,175, br);
-        ctx.fillRect(x+w*0.32, y+h*0.26, w*0.36, h*0.07);
+        // ── GORGUERA (cuello con láminas) ─────────────────────────────────
+        ctx.fillStyle = C(140,145,155, br);
+        ctx.fillRect(x+w*0.33, y+h*0.25, w*0.34, h*0.07);
+        ctx.fillStyle = C(118,123,133, br);
+        ctx.fillRect(x+w*0.35, y+h*0.29, w*0.30, h*0.03);
 
-        // Cabeza — piel
-        ctx.fillStyle = C(220,185,160, br);
-        ctx.fillRect(x+w*0.30, y+h*0.13, w*0.40, h*0.14);
+        // ── CABEZA — piel y barba ─────────────────────────────────────────
+        // Cara visible bajo el visor
+        ctx.fillStyle = C(215,178,148, br);
+        ctx.fillRect(x+w*0.30, y+h*0.14, w*0.40, h*0.13);
+        // Barba marrón
+        ctx.fillStyle = C(90,62,38, br);
+        ctx.fillRect(x+w*0.32, y+h*0.22, w*0.36, h*0.05);
+        // Bigote
+        ctx.fillRect(x+w*0.36, y+h*0.19, w*0.28, h*0.03);
 
-        // Barba
-        ctx.fillStyle = C(80,55,35, br);
-        ctx.fillRect(x+w*0.33, y+h*0.22, w*0.34, h*0.06);
+        // ── MORIÓN (casco español característico) ────────────────────────
+        // Base del casco — plateado
+        ctx.fillStyle = C(155,160,170, br);
+        ctx.fillRect(x+w*0.24, y+h*0.07, w*0.52, h*0.09);
+        // Parte superior redondeada del morión
+        ctx.fillRect(x+w*0.30, y+h*0.01, w*0.40, h*0.07);
+        ctx.fillRect(x+w*0.36, y-h*0.03, w*0.28, h*0.05);
+        // Cresta central del morión (cimera)
+        ctx.fillStyle = C(140,145,155, br);
+        ctx.fillRect(x+w*0.46, y-h*0.06, w*0.08, h*0.10);
+        // Ala del morión (guardacaras)
+        ctx.fillStyle = C(148,153,163, br);
+        ctx.fillRect(x+w*0.18, y+h*0.09, w*0.10, h*0.04);
+        ctx.fillRect(x+w*0.72, y+h*0.09, w*0.10, h*0.04);
+        // Visera / guarda nariz
+        ctx.fillStyle = C(110,115,125, br);
+        ctx.fillRect(x+w*0.37, y+h*0.12, w*0.26, h*0.03);
+        // Brillo del casco
+        ctx.fillStyle = C(200,205,215, br*0.5);
+        ctx.fillRect(x+w*0.32, y+h*0.02, w*0.10, h*0.10);
 
-        // Celada (casco)
-        ctx.fillStyle = C(160,165,175, br);
-        ctx.fillRect(x+w*0.27, y+h*0.00, w*0.46, h*0.08);
-        ctx.fillRect(x+w*0.25, y+h*0.07, w*0.50, h*0.07);
+        // ── PLUMA DEL CASCO (bicolor: roja + amarilla) ────────────────────
+        // Pluma roja (izquierda/atrás)
+        for (let i = 0; i < 5; i++) {
+            const swing = Math.sin(t*3 + i*0.5) * w * 0.015;
+            const px = x + w*(0.34 + i*0.04) + swing;
+            const py = y - h*(0.06 + i*0.015);
+            ctx.fillStyle = C(190, 18+i*8, 18, br);
+            ctx.fillRect(px, py, w*0.055, h*(0.09 + i*0.01));
+        }
+        // Pluma amarilla (derecha/frente)
+        for (let i = 0; i < 4; i++) {
+            const swing = Math.sin(t*3.5 + i*0.7 + 1.2) * w * 0.015;
+            const px = x + w*(0.52 + i*0.035) + swing;
+            const py = y - h*(0.04 + i*0.01);
+            ctx.fillStyle = C(220, 175+i*10, 20, br);
+            ctx.fillRect(px, py, w*0.05, h*(0.08 + i*0.008));
+        }
 
-        // Cresta del casco
-        ctx.fillStyle = C(200,20,20, br);
-        ctx.fillRect(x+w*0.42, y-h*0.05, w*0.16, h*0.07);
-
-        // Ojos
-        const eyeY = Math.floor(y+h*0.15);
-        ctx.fillStyle = aiEstado && aiEstado!=='patrol' ? C(200,20,20,br) : C(50,100,200,br);
-        ctx.fillRect(x+w*0.34, eyeY, w*0.10, h*0.05);
-        ctx.fillRect(x+w*0.56, eyeY, w*0.10, h*0.05);
+        // ── OJOS (rojos en combate, normales en patrulla) ─────────────────
+        const eyeY = y + h*0.155;
+        const combate = aiEstado && aiEstado !== 'patrol';
+        ctx.fillStyle = combate ? C(220,20,20,br) : C(55,90,200,br);
+        ctx.fillRect(x+w*0.34, eyeY, w*0.11, h*0.045);
+        ctx.fillRect(x+w*0.55, eyeY, w*0.11, h*0.045);
+        // Brillo en los ojos
+        ctx.fillStyle = C(255,255,255, br*0.7);
+        ctx.fillRect(x+w*0.36, eyeY+h*0.005, w*0.03, h*0.02);
+        ctx.fillRect(x+w*0.57, eyeY+h*0.005, w*0.03, h*0.02);
     }
 };
 
