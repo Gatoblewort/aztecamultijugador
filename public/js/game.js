@@ -553,7 +553,6 @@ function disparar() {
     lastShot=now;
     const dx=Math.cos(yo.angle)*BULLET_SPD;
     const dy=Math.sin(yo.angle)*BULLET_SPD;
-    spawnParticula(yo.x+Math.cos(yo.angle)*30,yo.y+Math.sin(yo.angle)*30,255,200,80,8);
     SOUND.disparo(armaActual);
     socket.emit('disparar',{x:yo.x,y:yo.y,dx,dy,danio:arma.danio,arma:armaActual,angle:yo.angle});
 }
