@@ -21,9 +21,9 @@ const TURN_SPD   = 0.045;
 const BULLET_SPD = 12;
 
 const ARMAS = [
-    { nombre:'Macuahuitl', danio:15, cooldown:150, color:'#cc4400' },
-    { nombre:'Atlatl',     danio:25, cooldown:250, color:'#886600' },
-    { nombre:'Arco',       danio:40, cooldown:400, color:'#228844' }
+    { nombre:'Macuahuitl', danio:15, cooldown:150, color:'#cc4400', ammoMax:999 },
+    { nombre:'Atlatl',     danio:25, cooldown:250, color:'#886600', ammoMax:999 },
+    { nombre:'Arco',       danio:40, cooldown:400, color:'#228844', ammoMax:999 }
 ];
 
 // ── Estado global del cliente ─────────────────────────────────────────────
@@ -69,6 +69,7 @@ window.addEventListener('load', () => {
     resize();
     window.addEventListener('resize', resize);
     generarTexturas();
+    SOUND.init(); // inicializar audio al primer load
 
     mapa       = datos.mapa;
     miId       = datos.tuId;
@@ -204,6 +205,8 @@ function conectarSocket(token, salaId) {
     socket.on('connect', () => {
         console.log('🟢 Socket conectado, nuevo id:', socket.id);
         socket.emit('reconectar_sala', { salaId, socketIdAnterior: miId });
+        SOUND.reanudar();
+        SOUND.iniciarMusica();
     });
 
     // Movimiento de otros jugadores/NPCs
@@ -252,7 +255,7 @@ function conectarSocket(token, salaId) {
     socket.on('jugador_recibio_danio', ({id,hp,fromId,danio}) => {
         if (jugadores[id]) jugadores[id].hp=hp;
         if (id===miId) {
-            yo.hp=hp; actualizarHP(); flashDanio();
+            yo.hp=hp; actualizarHP(); flashDanio(); SOUND.danio();
         }
     });
 
@@ -271,6 +274,7 @@ function conectarSocket(token, salaId) {
 
         if (matadoPor === miId) {
             if (yo) { yo.kills = kills; setText('hudKills', kills); }
+            SOUND.muerteNPC();
             addKillfeed(`⚔️ ${yo?.nombre||'Tú'} eliminó a ${nombreVictima}`, true);
         } else if (!esNPCmuerto) {
             // Solo mostrar killfeed si murió un jugador real, no un NPC
@@ -278,7 +282,7 @@ function conectarSocket(token, salaId) {
         }
 
         // Solo activar respawn si NOSOTROS morimos
-        if (id === miId) { vivo = false; mostrarRespawn(5); }
+        if (id === miId) { vivo = false; SOUND.muerteJugador(); mostrarRespawn(5); }
     });
 
     socket.on('jugador_respawn', ({id,x,y,hp}) => {
@@ -287,22 +291,23 @@ function conectarSocket(token, salaId) {
         if (id===miId) {
             yo.x=x; yo.y=y; yo.hp=hp; vivo=true;
             document.getElementById('respawnOverlay').style.display='none';
-            actualizarHP();
+            actualizarHP(); SOUND.respawn();
         }
     });
 
     // Pickups
     socket.on('moneda_recogida', ({monedaId,porId,monedas:m}) => {
         delete monedas[monedaId];
-        if (porId===miId) { yo.monedas=m||0; setText('hudMonedas',yo.monedas); }
+        if (porId===miId) { yo.monedas=m||0; setText('hudMonedas',yo.monedas); SOUND.moneda(); }
     });
     socket.on('corazon_recogido', ({id,porId,hp}) => {
         delete corazones[id];
+        if (porId===miId) SOUND.corazon();
         if (porId===miId && yo) { yo.hp=hp; actualizarHP(); }
     });
     socket.on('ammo_recogido', ({id,porId,ammo}) => {
         delete ammoDrops[id];
-        if (porId===miId && yo) yo.ammo=ammo;
+        if (porId===miId && yo) { yo.ammo=ammo; SOUND.ammo(); actualizarHUDAmmo(); }
     });
     socket.on('pickup_spawned', ({tipo,data}) => {
         if (tipo==='moneda')   monedas[data.id]=data;
@@ -382,6 +387,7 @@ function conectarSocket(token, salaId) {
 
         // FIX BUG SYNC: ahora sí está seguro enviar movimiento
         syncConfirmado = true;
+        actualizarHUDAmmo();
         console.log('🔄 Sync confirmado, miId:', miId);
     });
 
@@ -417,6 +423,7 @@ function loop(ts) {
     actualizarParticulas(dt);
     comprobarPickups();
     try { render(); } catch(e) { console.warn('render error:', e.message); }
+    if (bossData?.active) SOUND.tickJefe(gameTime);
     try { renderMinimap(); } catch(e) { console.warn('minimap error:', e.message); }
     requestAnimationFrame(loop);
 }
@@ -522,6 +529,10 @@ function procesarInput(dt) {
     PHYSICS.tickSalto(yo, dt);
     if (yo.onGround) saltando = false;
 
+    // Sonido de pasos
+    const seMoviendo = keys['KeyW']||keys['KeyS']||keys['KeyA']||keys['KeyD']||keys['ArrowUp']||keys['ArrowDown']||joystick.active;
+    SOUND.iniciarPasos(seMoviendo && vivo);
+
     // FIX BUG SYNC: no enviar mover hasta confirmar sync con el servidor
     if (syncConfirmado && Date.now() - lastMoveSent > 50) {
         socket.emit('mover', { x: yo.x, y: yo.y, angle: yo.angle, z: yo.z || 0 });
@@ -543,6 +554,7 @@ function disparar() {
     const dx=Math.cos(yo.angle)*BULLET_SPD;
     const dy=Math.sin(yo.angle)*BULLET_SPD;
     spawnParticula(yo.x+Math.cos(yo.angle)*30,yo.y+Math.sin(yo.angle)*30,255,200,80,8);
+    SOUND.disparo(armaActual);
     socket.emit('disparar',{x:yo.x,y:yo.y,dx,dy,danio:arma.danio,arma:armaActual,angle:yo.angle});
 }
 
@@ -550,6 +562,16 @@ function cambiarArma() {
     armaActual=(armaActual+1)%ARMAS.length;
     setText('armaName',ARMAS[armaActual].nombre);
     document.getElementById('armaName').style.color=ARMAS[armaActual].color;
+    actualizarHUDAmmo();
+}
+function actualizarHUDAmmo() {
+    if (!yo) return;
+    const ammoEl = document.getElementById('municion');
+    if (!ammoEl) return;
+    const ammo = yo.ammo !== undefined ? yo.ammo : 50;
+    const max  = ARMAS[armaActual].ammoMax || 50;
+    ammoEl.textContent = `🏹 ${ammo} / ${max}`;
+    ammoEl.style.color = ammo <= 10 ? '#ff4444' : ammo <= 25 ? '#ffd60a' : '#8888aa';
 }
 
 // ── Balas (cliente — visual solamente) ───────────────────────────────────
@@ -618,23 +640,44 @@ function actualizarParticulas(dt) {
 }
 
 // ── Raycaster ─────────────────────────────────────────────────────────────
+// ── Raycaster DDA (Digital Differential Analysis) — estándar desde Wolfenstein ──
+// Mucho más rápido que el brute-force anterior: O(hits) en lugar de O(1400)
 function castRay(angle) {
-    const rdx=Math.cos(angle),rdy=Math.sin(angle);
-    let rx=yo.x,ry=yo.y;
-    for (let i=0;i<1400;i++) {
-        rx+=rdx*.5;ry+=rdy*.5;
-        const mx=Math.floor(rx/TILE),my=Math.floor(ry/TILE);
-        if (mx<0||mx>=mapa.ancho||my<0||my>=mapa.alto) return{hit:false,dist:900};
-        const tile=mapa.tiles[my][mx];
-        if (tile!==0) {
-            const dx=rx-yo.x,dy=ry-yo.y,dist=Math.sqrt(dx*dx+dy*dy);
-            const px=rx-rdx*.5,py=ry-rdy*.5;
-            const side=(Math.floor(px/TILE)!==mx)?1:0;
-            const wallX=side===0?((ry/TILE)%1):((rx/TILE)%1);
-            return{hit:true,dist,tile,side,wallX:Math.max(0,wallX)};
+    const rdx = Math.cos(angle), rdy = Math.sin(angle);
+    // Posición del jugador en coordenadas de tile
+    let mapX = Math.floor(yo.x / TILE), mapY = Math.floor(yo.y / TILE);
+    // Longitud del rayo para cruzar 1 tile en cada eje
+    const deltaX = Math.abs(1 / rdx), deltaY = Math.abs(1 / rdy);
+    // Paso de tile (±1) y distancia inicial al primer borde de tile
+    const stepX = rdx < 0 ? -1 : 1;
+    const stepY = rdy < 0 ? -1 : 1;
+    let sideDistX = rdx < 0
+        ? (yo.x / TILE - mapX) * deltaX
+        : (mapX + 1 - yo.x / TILE) * deltaX;
+    let sideDistY = rdy < 0
+        ? (yo.y / TILE - mapY) * deltaY
+        : (mapY + 1 - yo.y / TILE) * deltaY;
+
+    let side = 0; // 0=vertical wall hit, 1=horizontal wall hit
+    for (let i = 0; i < 256; i++) {
+        if (sideDistX < sideDistY) { sideDistX += deltaX; mapX += stepX; side = 0; }
+        else                       { sideDistY += deltaY; mapY += stepY; side = 1; }
+        if (mapX < 0 || mapX >= mapa.ancho || mapY < 0 || mapY >= mapa.alto)
+            return { hit: false, dist: 900 };
+        const tile = mapa.tiles[mapY][mapX];
+        if (tile !== 0) {
+            // Distancia perpendicular (evita fish-eye)
+            const perpDist = side === 0
+                ? (mapX - yo.x / TILE + (1 - stepX) / 2) / rdx * TILE
+                : (mapY - yo.y / TILE + (1 - stepY) / 2) / rdy * TILE;
+            // Posición exacta en la pared para coordenada de textura
+            const wallX = side === 0
+                ? (yo.y + perpDist * rdy) / TILE % 1
+                : (yo.x + perpDist * rdx) / TILE % 1;
+            return { hit: true, dist: Math.abs(perpDist), tile, side, wallX: Math.max(0, wallX) };
         }
     }
-    return{hit:false,dist:900};
+    return { hit: false, dist: 900 };
 }
 
 function rgba(r,g,b,a=255){return((a&0xff)<<24)|((b&0xff)<<16)|((g&0xff)<<8)|(r&0xff);}
@@ -1271,7 +1314,7 @@ function addKillfeed(txt,esMio=false){
 function setText(id,val){const el=document.getElementById(id);if(el)el.textContent=val;}
 function escHtml(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML;}
 function volverLobby(){
-    // Limpiar estado del juego
+    SOUND.detenerMusica();
     if (socket) { socket.disconnect(); socket = null; }
     sessionStorage.removeItem('aw_partida');
     sessionStorage.removeItem('aw_socket_id');

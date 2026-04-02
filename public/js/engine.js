@@ -361,8 +361,8 @@ function updateBullets(estado, dt) {
                 // Chequear enemigos
                 for (const e of enemies) {
                     if (!e.active) continue;
-                    if (dist(b.x,b.y,e.x,e.y) < 64) {
-                        e.hp -= Math.floor(b.danio * 0.4); // daño reducido — NPCs duran más
+                    if (dist(b.x,b.y,e.x,e.y) < 24) {
+                        e.hp -= Math.floor(b.danio * 0.7); // daño reducido — NPCs duran más
                         b.active = false; // FIX: destruir bala al impactar NPC
                         hit = true;
                         // Notificar daño al NPC
@@ -400,7 +400,7 @@ function updateBullets(estado, dt) {
 
                 // Chequear jefe
                 if (!hit && boss && boss.active) {
-                    if (dist(b.x,b.y,boss.x,boss.y) < 64) {
+                    if (dist(b.x,b.y,boss.x,boss.y) < 40) {
                         boss.hp -= b.danio;
                         hit = true;
                         b.active = false;
@@ -422,7 +422,7 @@ function updateBullets(estado, dt) {
                 if (!hit) {
                     for (const [sid, target] of players) {
                         if (sid === b.fromId || !target.vivo) continue;
-                        if (dist(b.x,b.y,target.x,target.y) < 64) {
+                        if (dist(b.x,b.y,target.x,target.y) < 28) {
                             let dmgReal = b.danio;
                             if (level === 3) dmgReal = Math.floor(dmgReal * 0.6); // reducción nivel 3
                             target.hp -= dmgReal;
@@ -446,7 +446,7 @@ function updateBullets(estado, dt) {
                 // Bala de enemigo — solo afecta jugadores
                 for (const [sid, target] of players) {
                     if (!target.vivo || target.invulTime > 0) continue;
-                    if (dist(b.x,b.y,target.x,target.y) < 48) {
+                    if (dist(b.x,b.y,target.x,target.y) < 28) {
                         let dmgReal = b.danio;
                         if (level === 3) dmgReal = Math.floor(dmgReal * 0.6);
                         target.hp -= dmgReal;

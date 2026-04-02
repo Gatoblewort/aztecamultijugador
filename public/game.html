@@ -8,7 +8,6 @@
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:#000;overflow:hidden;font-family:'Segoe UI',sans-serif;touch-action:none;}
 
-/* Canvas NO recibe pointer events en móvil — los reciben los divs encima */
 #gameCanvas{display:block;width:100vw;height:100vh;image-rendering:pixelated;pointer-events:none;}
 
 /* ── ZONA DE CÁMARA — mitad derecha, encima de todo excepto botones ── */
@@ -16,7 +15,7 @@ body{background:#000;overflow:hidden;font-family:'Segoe UI',sans-serif;touch-act
     position:fixed;
     top:0; right:0;
     width:50%; height:100%;
-    z-index:18;          /* encima del canvas, debajo de botones (z:20) */
+    z-index:18;
     touch-action:none;
     -webkit-tap-highlight-color:transparent;
     background:transparent;
@@ -46,6 +45,11 @@ body{background:#000;overflow:hidden;font-family:'Segoe UI',sans-serif;touch-act
 #hudMonedasBlock .hud-val{font-size:16px;}
 #hudMonedasBlock .hud-lbl{font-size:8px;}
 
+/* ── NIVEL INDICATOR ── */
+#hudNivelBlock{background:#00000077;border-radius:10px;padding:6px 14px;
+    border:1px solid #7c3aed44;backdrop-filter:blur(4px);}
+#hudNivel{font-size:13px;font-weight:700;color:#a855f7;}
+
 /* ── MINIMAP ── */
 #minimap{position:fixed;top:10px;right:14px;
     width:130px;height:130px;border-radius:10px;
@@ -68,9 +72,19 @@ body{background:#000;overflow:hidden;font-family:'Segoe UI',sans-serif;touch-act
 .hp-fill.medio{background:linear-gradient(90deg,#ffd60a,#ffaa00);}
 #hpText{font-size:14px;font-weight:800;color:#fff;}
 
+/* ── ARMA E INFO ── */
 #armaInfo{text-align:right;}
 #armaName{font-size:14px;font-weight:700;color:#a855f7;}
-#municion{font-size:12px;color:#8888aa;}
+#municion{font-size:12px;color:#8888aa;margin-top:2px;}
+#ammoBar{width:80px;height:4px;background:#ffffff22;border-radius:2px;overflow:hidden;margin-top:3px;margin-left:auto;}
+#ammoBarFill{height:100%;background:#8888aa;border-radius:2px;transition:width .2s;}
+
+/* ── BOTÓN SONIDO ── */
+#btnSonido{position:fixed;top:10px;right:152px;z-index:15;
+    background:#00000077;border:1px solid #ffffff22;border-radius:8px;
+    color:#fff;font-size:16px;padding:6px 10px;cursor:pointer;
+    backdrop-filter:blur(4px);pointer-events:all;}
+#btnSonido:hover{background:#00000099;}
 
 /* ── KILLFEED ── */
 #killfeed{position:fixed;top:155px;right:14px;
@@ -138,7 +152,6 @@ body{background:#000;overflow:hidden;font-family:'Segoe UI',sans-serif;touch-act
     width:56px;height:56px;border-radius:50%;border:none;
     background:#7c3aed99;color:#fff;font-size:20px;cursor:pointer;touch-action:none;}
 
-/* Indicador visual de zona de cámara (solo en móvil, semitransparente) */
 @media (pointer:coarse) {
     #lookZone::after{
         content:'👁 Desliza para girar';
@@ -156,9 +169,10 @@ body{background:#000;overflow:hidden;font-family:'Segoe UI',sans-serif;touch-act
 <body>
 
 <canvas id="gameCanvas"></canvas>
-
-<!-- ZONA DE CÁMARA — mitad derecha, captura touches para girar vista -->
 <div id="lookZone"></div>
+
+<!-- Botón sonido (mute/unmute) -->
+<button id="btnSonido" onclick="toggleSonido()" title="Silenciar/activar sonido">🔊</button>
 
 <!-- HUD -->
 <div id="hud">
@@ -171,6 +185,9 @@ body{background:#000;overflow:hidden;font-family:'Segoe UI',sans-serif;touch-act
             <div id="hudMonedasBlock">
                 <div class="hud-val" id="hudMonedas">0</div>
                 <div class="hud-lbl">🪙 Monedas</div>
+            </div>
+            <div id="hudNivelBlock">
+                <div id="hudNivel">Nivel 1</div>
             </div>
         </div>
         <div class="hud-block">
@@ -193,7 +210,8 @@ body{background:#000;overflow:hidden;font-family:'Segoe UI',sans-serif;touch-act
     </div>
     <div id="armaInfo">
         <div id="armaName">Macuahuitl</div>
-        <div id="municion">Ilimitado</div>
+        <div id="municion">🏹 50 / 999</div>
+        <div id="ammoBar"><div id="ammoBarFill" style="width:100%"></div></div>
     </div>
 </div>
 
@@ -248,5 +266,24 @@ body{background:#000;overflow:hidden;font-family:'Segoe UI',sans-serif;touch-act
 <script src="/js/engine.js"></script>
 <script src="/js/skins.js"></script>
 <script src="/js/game.js"></script>
+
+<script>
+// ── Mute/Unmute ──────────────────────────────────────────────────────────
+let sonidoActivo = true;
+function toggleSonido() {
+    sonidoActivo = !sonidoActivo;
+    SOUND.setVolumen(sonidoActivo ? 0.4 : 0);
+    document.getElementById('btnSonido').textContent = sonidoActivo ? '🔊' : '🔇';
+    if (sonidoActivo) {
+        SOUND.reanudar();
+        SOUND.iniciarMusica();
+    } else {
+        SOUND.detenerMusica();
+    }
+}
+// Activar audio en primer click/touch (política de autoplay)
+document.addEventListener('click',    () => { if (typeof SOUND !== 'undefined') { SOUND.init(); SOUND.reanudar(); } }, { once: true });
+document.addEventListener('touchstart',() => { if (typeof SOUND !== 'undefined') { SOUND.init(); SOUND.reanudar(); } }, { once: true });
+</script>
 </body>
 </html>
