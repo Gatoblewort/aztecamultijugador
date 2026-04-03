@@ -35,8 +35,8 @@ SKINS.conquistador = {
     draw(ctx, x, y, w, h, t, bright, aiEstado, flashTs=0) {
         const br   = bright;
         const B    = (r,g,b) => C(r,g,b,br);
-        // Walk: solo desplazamiento Y muy pequeño, NO modifica altura
-        const wk   = Math.sin(t * 7) * h * 0.008;
+        // Sin animación de piernas — estático
+        const wk   = 0;
         const R    = (fx,fy,fw,fh,r,g,b) => {
             ctx.fillStyle = B(r,g,b);
             ctx.fillRect(x+fx*w, y+fy*h, fw*w, fh*h);
