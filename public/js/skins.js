@@ -378,82 +378,120 @@ SKINS.conquistador = {
 // ══════════════════════════════════════════════════════════════════════════
 SKINS.guerrero_base = {
     nombre: 'Guerrero Azteca',
-
-    // Paleta de colores de la skin
-    piel:     [180, 130, 70],
-    armadura: [80,  60,  30],
-    penacho:  [204, 68,   0],
-
     draw(ctx, x, y, w, h, t, bright) {
         const br = bright;
-        const [pr,pg,pb] = this.piel;
-        const [ar,ag,ab] = this.armadura;
-        const walk = Math.sin(t*8) * h * 0.05;
-
+        const B  = (r,g,b) => C(r,g,b,br);
+        const R  = (fx,fy,fw,fh,r,g,b) => {
+            ctx.fillStyle = B(r,g,b);
+            ctx.fillRect(x+fx*w, y+fy*h, fw*w, fh*h);
+        };
         // Sombra
-        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.fillStyle = 'rgba(0,0,0,0.32)';
         ctx.beginPath();
-        ctx.ellipse(x+w/2, y+h, w*0.3, h*0.04, 0, 0, Math.PI*2);
+        ctx.ellipse(x+w*0.50, y+h*0.99, w*0.28, h*0.030, 0, 0, Math.PI*2);
         ctx.fill();
-
-        // Penacho (plumas arriba de la cabeza)
-        const plumas = [[0.25,0],[0.38,-0.06],[0.50,-0.08],[0.62,-0.06],[0.75,0]];
-        plumas.forEach(([fx, fy], i) => {
-            const swing = Math.sin(t*3 + i*0.8) * w * 0.02;
-            ctx.fillStyle = i%2===0 ? C(this.penacho[0],this.penacho[1],this.penacho[2],br)
-                                    : C(255,215,0,br);
-            ctx.fillRect(x+w*fx+swing, y+h*fy-h*0.08, w*0.10, h*0.10);
+        // Penacho — 5 plumas alternadas naranja/dorado con movimiento
+        const plumas = [[0.22,-0.02],[0.34,-0.08],[0.48,-0.11],[0.62,-0.08],[0.74,-0.02]];
+        plumas.forEach(([fx,fy],i) => {
+            const sw = Math.sin(t*3+i*0.9)*w*0.018;
+            ctx.fillStyle = i%2===0 ? B(210,68,0) : B(240,195,20);
+            ctx.fillRect(x+w*fx+sw, y+h*fy, w*0.10, h*0.13);
+            ctx.fillStyle = i%2===0 ? B(165,48,0) : B(185,148,12);
+            ctx.fillRect(x+w*fx+sw+w*0.042, y+h*fy, w*0.018, h*0.13);
         });
-
-        // Piernas
-        ctx.fillStyle = C(ar,ag,ab, br);
-        ctx.fillRect(x+w*0.20, y+h*0.65, w*0.25, h*0.30+walk);
-        ctx.fillRect(x+w*0.55, y+h*0.65, w*0.25, h*0.30-walk);
-
-        // Faja/taparrabos
-        ctx.fillStyle = C(this.penacho[0],this.penacho[1],this.penacho[2], br);
-        ctx.fillRect(x+w*0.25, y+h*0.60, w*0.50, h*0.10);
-
-        // Torso — pectoral de jade
-        ctx.fillStyle = C(ar,ag,ab, br);
-        ctx.fillRect(x+w*0.20, y+h*0.30, w*0.60, h*0.32);
-
-        // Decoración del pectoral
-        ctx.fillStyle = C(0,168,107, br);
-        ctx.fillRect(x+w*0.35, y+h*0.33, w*0.30, h*0.12);
-
-        // Brazos con brazaletes
-        ctx.fillStyle = C(pr,pg,pb, br);
-        ctx.fillRect(x+w*0.04, y+h*0.30, w*0.16, h*0.30);
-        ctx.fillRect(x+w*0.80, y+h*0.30, w*0.16, h*0.30);
-
+        // Piernas con protecciones
+        R(0.220,0.640,0.245,0.165,  85,60,28);
+        R(0.225,0.643,0.068,0.155,  108,78,38);   // brillo
+        R(0.535,0.640,0.245,0.165,  85,60,28);
+        R(0.538,0.643,0.068,0.155,  108,78,38);
+        // Rodilleras de hueso
+        R(0.212,0.796,0.268,0.052,  215,195,155);
+        R(0.232,0.800,0.068,0.036,  240,220,180);
+        R(0.522,0.796,0.268,0.052,  215,195,155);
+        R(0.542,0.800,0.068,0.036,  240,220,180);
+        // Sandalias de cuero
+        R(0.205,0.895,0.278,0.042,  62,42,18);
+        R(0.205,0.932,0.278,0.025,  42,28,10);
+        R(0.518,0.895,0.278,0.042,  62,42,18);
+        R(0.518,0.932,0.278,0.025,  42,28,10);
+        // Cinturón / faja naranja
+        R(0.218,0.618,0.564,0.028,  195,65,0);
+        R(0.442,0.618,0.116,0.028,  240,188,20); // hebilla
+        // Taparrabos
+        R(0.252,0.642,0.098,0.048,  185,60,0);
+        R(0.392,0.642,0.118,0.042,  165,52,0);
+        R(0.524,0.642,0.098,0.048,  185,60,0);
+        // Torso — pectoral de jade con detalles
+        R(0.215,0.288,0.570,0.332,  82,58,26);
+        R(0.218,0.290,0.068,0.326,  108,78,38);  // brillo
+        R(0.708,0.290,0.052,0.326,  55,38,14);   // sombra
+        // Pectoral de jade (rectángulo central decorado)
+        R(0.338,0.300,0.324,0.128,  0,148,95);
+        R(0.342,0.303,0.085,0.120,  0,178,115);  // brillo jade
+        R(0.338,0.300,0.002,0.128,  0,108,68);
+        R(0.660,0.300,0.002,0.128,  0,108,68);
+        R(0.338,0.300,0.324,0.002,  0,108,68);
+        R(0.338,0.426,0.324,0.002,  0,108,68);
+        // Glifo central en el pectoral
+        R(0.458,0.312,0.084,0.104,  0,108,68);
+        R(0.462,0.316,0.076,0.096,  0,188,128);
+        R(0.480,0.316,0.018,0.096,  0,148,95);
+        R(0.462,0.356,0.076,0.018,  0,148,95);
+        // Hombros con hombreras de jade
+        R(0.060,0.262,0.168,0.095,  0,138,88);
+        R(0.065,0.266,0.048,0.082,  0,168,108);
+        R(0.060,0.352,0.168,0.015,  0,98,62);
+        R(0.772,0.262,0.168,0.095,  0,138,88);
+        R(0.835,0.266,0.048,0.082,  0,168,108);
+        R(0.772,0.352,0.168,0.015,  0,98,62);
+        // Brazos piel
+        R(0.058,0.355,0.148,0.132,  175,125,68);
+        R(0.062,0.358,0.048,0.125,  205,152,88);
+        R(0.048,0.472,0.162,0.042,  62,42,18);  // codo
+        R(0.062,0.510,0.135,0.105,  175,125,68);
+        R(0.794,0.355,0.148,0.132,  175,125,68);
+        R(0.852,0.358,0.048,0.125,  205,152,88);
+        R(0.790,0.472,0.162,0.042,  62,42,18);
+        R(0.803,0.510,0.135,0.105,  175,125,68);
         // Brazaletes dorados
-        ctx.fillStyle = C(255,215,0, br);
-        ctx.fillRect(x+w*0.03, y+h*0.50, w*0.18, h*0.05);
-        ctx.fillRect(x+w*0.79, y+h*0.50, w*0.18, h*0.05);
-
-        // Arma (macuahuitl) en mano derecha
-        ctx.fillStyle = C(120,70,25, br);
-        ctx.fillRect(x+w*0.82, y+h*0.20, w*0.10, h*0.50);
-        ctx.fillStyle = C(15,15,30, br);
-        ctx.fillRect(x+w*0.78, y+h*0.20, w*0.06, h*0.40);
-        // Filos de obsidiana
-        ctx.fillStyle = C(200,200,240, br);
-        for (let i=0;i<3;i++)
-            ctx.fillRect(x+w*0.77, y+h*(0.22+i*0.12), w*0.04, h*0.06);
-
+        R(0.042,0.498,0.175,0.038,  218,178,20);
+        R(0.046,0.502,0.085,0.025,  245,210,55);
+        R(0.783,0.498,0.175,0.038,  218,178,20);
+        R(0.786,0.502,0.085,0.025,  245,210,55);
+        // Macuahuitl (mano derecha)
+        R(0.832,0.185,0.095,0.055,  62,38,12);  // empuñadura madera
+        R(0.836,0.188,0.048,0.045,  85,52,18);
+        R(0.820,0.235,0.058,0.385,  28,22,42);  // hoja obsidiana
+        R(0.824,0.238,0.020,0.375,  45,40,65);  // brillo hoja
+        // Filos de obsidiana (izq y der)
+        for(let i=0;i<4;i++){
+            R(0.808,0.245+i*0.088,0.018,0.055, 188,188,225);
+            R(0.875,0.248+i*0.088,0.018,0.050, 175,175,210);
+        }
         // Cabeza
-        ctx.fillStyle = C(pr,pg,pb, br);
-        ctx.fillRect(x+w*0.30, y+h*0.05, w*0.40, h*0.26);
-
-        // Ojos
-        ctx.fillStyle = C(30,20,10, br);
-        ctx.fillRect(x+w*0.36, y+h*0.12, w*0.10, h*0.06);
-        ctx.fillRect(x+w*0.54, y+h*0.12, w*0.10, h*0.06);
-
-        // Pintura de guerra (rayas en la cara)
-        ctx.fillStyle = C(200,20,20, br);
-        ctx.fillRect(x+w*0.32, y+h*0.18, w*0.36, h*0.03);
+        R(0.295,0.062,0.410,0.238,  175,125,68);
+        R(0.298,0.065,0.098,0.228,  205,152,88);  // brillo
+        // Pintura de guerra roja
+        R(0.295,0.165,0.410,0.028,  195,18,18);
+        R(0.295,0.192,0.125,0.020,  172,14,14);
+        R(0.580,0.192,0.125,0.020,  172,14,14);
+        // Ojos con pintura negra
+        R(0.325,0.118,0.135,0.022,  18,12,8);  // pintura ojo izq
+        R(0.540,0.118,0.135,0.022,  18,12,8);
+        R(0.338,0.122,0.095,0.038,  22,170,115); // iris jade
+        R(0.552,0.122,0.095,0.038,  22,170,115);
+        R(0.365,0.126,0.038,0.026,  8,8,8);  // pupila
+        R(0.578,0.126,0.038,0.026,  8,8,8);
+        R(0.340,0.124,0.018,0.015,  255,255,255); // brillo
+        R(0.554,0.124,0.018,0.015,  255,255,255);
+        // Nariz
+        R(0.458,0.152,0.058,0.048,  148,105,58);
+        // Boca con dientes
+        R(0.368,0.195,0.148,0.018,  28,16,8);
+        R(0.375,0.198,0.028,0.015,  235,225,205);
+        R(0.412,0.198,0.028,0.015,  235,225,205);
+        R(0.448,0.198,0.028,0.015,  235,225,205);
+        R(0.485,0.198,0.028,0.015,  235,225,205);
     }
 };
 
@@ -462,76 +500,116 @@ SKINS.guerrero_base = {
 // ══════════════════════════════════════════════════════════════════════════
 SKINS.jaguar = {
     nombre: 'Caballero Jaguar',
-    piel:     [140,  90,  50],
-    armadura: [160, 120,  40],
-    penacho:  [99,   66,   0],
-
     draw(ctx, x, y, w, h, t, bright) {
         const br = bright;
-        const walk = Math.sin(t*8) * h * 0.05;
-
+        const B  = (r,g,b) => C(r,g,b,br);
+        const R  = (fx,fy,fw,fh,r,g,b) => {
+            ctx.fillStyle = B(r,g,b);
+            ctx.fillRect(x+fx*w, y+fy*h, fw*w, fh*h);
+        };
         // Sombra
-        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.fillStyle = 'rgba(0,0,0,0.32)';
         ctx.beginPath();
-        ctx.ellipse(x+w/2, y+h, w*0.3, h*0.04, 0, 0, Math.PI*2);
+        ctx.ellipse(x+w*0.50, y+h*0.99, w*0.28, h*0.030, 0, 0, Math.PI*2);
         ctx.fill();
-
         // Piernas con piel de jaguar
-        ctx.fillStyle = C(160,120,40, br);
-        ctx.fillRect(x+w*0.20, y+h*0.65, w*0.25, h*0.30+walk);
-        ctx.fillRect(x+w*0.55, y+h*0.65, w*0.25, h*0.30-walk);
-        // Manchas del jaguar en piernas
-        ctx.fillStyle = C(80,50,20, br);
-        ctx.fillRect(x+w*0.22, y+h*0.70, w*0.08, h*0.07);
-        ctx.fillRect(x+w*0.57, y+h*0.72, w*0.08, h*0.07);
-
-        // Torso — piel de jaguar
-        ctx.fillStyle = C(160,120,40, br);
-        ctx.fillRect(x+w*0.18, y+h*0.28, w*0.64, h*0.38);
-        // Manchas en torso
-        ctx.fillStyle = C(80,50,20, br);
-        for (let i=0;i<4;i++)
-            ctx.fillRect(x+w*(0.22+i*0.14), y+h*(0.32+Math.sin(i)*0.05), w*0.08, h*0.06);
-
+        R(0.218,0.638,0.248,0.168,  155,115,38);
+        R(0.222,0.642,0.068,0.158,  178,138,52);
+        R(0.534,0.638,0.248,0.168,  155,115,38);
+        // Manchas jaguar en piernas
+        R(0.225,0.668,0.072,0.058,  72,45,14);
+        R(0.245,0.718,0.052,0.042,  72,45,14);
+        R(0.548,0.672,0.068,0.052,  72,45,14);
+        R(0.562,0.720,0.055,0.040,  72,45,14);
+        // Pezuñas/garras
+        R(0.205,0.898,0.275,0.045,  48,32,12);
+        R(0.215,0.935,0.255,0.028,  32,20,6);
+        R(0.520,0.898,0.275,0.045,  48,32,12);
+        R(0.530,0.935,0.255,0.028,  32,20,6);
+        // Torso piel jaguar
+        R(0.212,0.285,0.576,0.340,  155,115,38);
+        R(0.216,0.288,0.072,0.332,  178,138,52);
+        R(0.705,0.288,0.055,0.332,  118,85,22);
+        // Manchas en torso (patrón jaguar)
+        R(0.248,0.298,0.082,0.062,  72,45,14);
+        R(0.365,0.308,0.075,0.055,  72,45,14);
+        R(0.482,0.295,0.088,0.068,  72,45,14);
+        R(0.598,0.310,0.068,0.058,  72,45,14);
+        R(0.275,0.388,0.072,0.058,  72,45,14);
+        R(0.408,0.378,0.082,0.062,  72,45,14);
+        R(0.535,0.385,0.075,0.055,  72,45,14);
+        // Cinturón
+        R(0.218,0.618,0.564,0.028,  108,75,22);
+        R(0.445,0.618,0.110,0.028,  218,178,20);
+        // Hombreras jaguar (con dientes)
+        R(0.055,0.258,0.185,0.102,  155,115,38);
+        R(0.058,0.262,0.055,0.088,  178,138,52);
+        for(let i=0;i<3;i++) R(0.068+i*0.048,0.352,0.030,0.025, 235,225,205);
+        R(0.760,0.258,0.185,0.102,  155,115,38);
+        R(0.835,0.262,0.055,0.088,  178,138,52);
+        for(let i=0;i<3;i++) R(0.768+i*0.048,0.352,0.030,0.025, 235,225,205);
         // Brazos
-        ctx.fillStyle = C(140,90,50, br);
-        ctx.fillRect(x+w*0.03, y+h*0.28, w*0.15, h*0.32);
-        ctx.fillRect(x+w*0.82, y+h*0.28, w*0.15, h*0.32);
-
-        // Arma — macuahuitl con decoración jaguar
-        ctx.fillStyle = C(120,70,25, br);
-        ctx.fillRect(x+w*0.84, y+h*0.18, w*0.10, h*0.52);
-        ctx.fillStyle = C(15,15,30, br);
-        ctx.fillRect(x+w*0.80, y+h*0.18, w*0.06, h*0.42);
-        ctx.fillStyle = C(200,200,240, br);
-        for (let i=0;i<4;i++)
-            ctx.fillRect(x+w*0.79, y+h*(0.20+i*0.10), w*0.04, h*0.06);
-
-        // CASCO DE JAGUAR — boca abierta del jaguar encuadrando la cara
-        ctx.fillStyle = C(160,120,40, br);
-        ctx.fillRect(x+w*0.20, y, w*0.60, h*0.30);
-        // Orejas del jaguar
-        ctx.fillRect(x+w*0.18, y-h*0.05, w*0.14, h*0.10);
-        ctx.fillRect(x+w*0.68, y-h*0.05, w*0.14, h*0.10);
-        // Dientes del casco
-        ctx.fillStyle = C(255,255,255, br);
-        for (let i=0;i<5;i++) {
-            ctx.fillRect(x+w*(0.26+i*0.10), y+h*0.26, w*0.06, h*0.06);
+        R(0.055,0.352,0.152,0.135,  140,102,45);
+        R(0.060,0.355,0.048,0.128,  168,128,58);
+        R(0.044,0.472,0.165,0.042,  108,78,22);
+        R(0.058,0.510,0.138,0.108,  140,102,45);
+        R(0.793,0.352,0.152,0.135,  140,102,45);
+        R(0.850,0.355,0.048,0.128,  168,128,58);
+        R(0.791,0.472,0.165,0.042,  108,78,22);
+        R(0.804,0.510,0.138,0.108,  140,102,45);
+        // Garras/brazaletes
+        for(let i=0;i<3;i++){
+            R(0.038+i*0.012,0.600,0.018,0.035, 235,225,195);
+            R(0.800+i*0.012,0.600,0.018,0.035, 235,225,195);
         }
-        // Cara interior (del guerrero)
-        ctx.fillStyle = C(140,90,50, br);
-        ctx.fillRect(x+w*0.32, y+h*0.08, w*0.36, h*0.18);
-        // Ojos pintados
-        ctx.fillStyle = C(255,215,0, br);
-        ctx.fillRect(x+w*0.36, y+h*0.12, w*0.10, h*0.06);
-        ctx.fillRect(x+w*0.54, y+h*0.12, w*0.10, h*0.06);
-        ctx.fillStyle = C(10,10,10, br);
-        ctx.fillRect(x+w*0.40, y+h*0.13, w*0.05, h*0.04);
-        ctx.fillRect(x+w*0.58, y+h*0.13, w*0.05, h*0.04);
+        // Macuahuitl con decoración jaguar
+        R(0.832,0.182,0.095,0.058,  108,78,22);
+        R(0.836,0.185,0.048,0.048,  138,105,35);
+        R(0.818,0.232,0.060,0.390,  28,22,42);
+        R(0.822,0.235,0.022,0.382,  45,40,65);
+        for(let i=0;i<4;i++){
+            R(0.806,0.242+i*0.090,0.020,0.058, 195,192,228);
+            R(0.876,0.245+i*0.090,0.020,0.052, 182,178,215);
+        }
+        // Manchas en el arma
+        R(0.835,0.252,0.038,0.025,  72,45,14);
+        R(0.835,0.328,0.038,0.022,  72,45,14);
+        // CASCO JAGUAR — cabeza de jaguar encuadrando la cara
+        R(0.188,0.000,0.624,0.305,  155,115,38);
+        R(0.192,0.003,0.075,0.295,  178,138,52); // brillo izq
+        R(0.705,0.003,0.058,0.295,  118,85,22);  // sombra der
         // Manchas en casco
-        ctx.fillStyle = C(80,50,20, br);
-        ctx.fillRect(x+w*0.23, y+h*0.05, w*0.08, h*0.06);
-        ctx.fillRect(x+w*0.69, y+h*0.05, w*0.08, h*0.06);
+        R(0.215,0.022,0.082,0.062,  72,45,14);
+        R(0.340,0.012,0.075,0.055,  72,45,14);
+        R(0.572,0.018,0.082,0.058,  72,45,14);
+        R(0.690,0.025,0.068,0.052,  72,45,14);
+        // Orejas del jaguar
+        R(0.175,-0.052,0.148,0.072,  155,115,38);
+        R(0.195,-0.042,0.055,0.048,  215,165,85); // interior oreja
+        R(0.677,-0.052,0.148,0.072,  155,115,38);
+        R(0.708,-0.042,0.055,0.048,  215,165,85);
+        // Nariz del casco jaguar (grande, negra)
+        R(0.422,0.255,0.156,0.042,  28,18,8);
+        R(0.432,0.258,0.068,0.025,  55,35,15);
+        // Fauces abiertas con dientes
+        R(0.205,0.278,0.590,0.035,  28,18,8);  // labio superior
+        for(let i=0;i<6;i++) R(0.222+i*0.092,0.272,0.060,0.038, 242,232,212);
+        // Cara interior del guerrero
+        R(0.298,0.065,0.404,0.218,  140,102,45);
+        R(0.302,0.068,0.098,0.208,  168,128,58);
+        // Ojos guerrero (dorados)
+        R(0.322,0.108,0.132,0.025,  18,12,6);
+        R(0.548,0.108,0.132,0.025,  18,12,6);
+        R(0.335,0.112,0.095,0.042,  218,178,20);
+        R(0.560,0.112,0.095,0.042,  218,178,20);
+        R(0.362,0.118,0.038,0.028,  8,6,4);
+        R(0.576,0.118,0.038,0.028,  8,6,4);
+        R(0.337,0.115,0.018,0.015,  255,248,200);
+        R(0.562,0.115,0.018,0.015,  255,248,200);
+        // Pintura de guerra
+        R(0.298,0.148,0.404,0.022,  185,12,12);
+        R(0.298,0.168,0.125,0.018,  165,10,10);
+        R(0.577,0.168,0.125,0.018,  165,10,10);
     }
 };
 
@@ -540,79 +618,119 @@ SKINS.jaguar = {
 // ══════════════════════════════════════════════════════════════════════════
 SKINS.aguila = {
     nombre: 'Caballero Águila',
-    piel:     [200, 170, 120],
-    armadura: [220, 200, 160],
-    penacho:  [255, 255, 255],
-
     draw(ctx, x, y, w, h, t, bright) {
         const br = bright;
-        const walk = Math.sin(t*8) * h * 0.05;
-        const wingFlap = Math.sin(t*4) * w * 0.04;
-
+        const B  = (r,g,b) => C(r,g,b,br);
+        const R  = (fx,fy,fw,fh,r,g,b) => {
+            ctx.fillStyle = B(r,g,b);
+            ctx.fillRect(x+fx*w, y+fy*h, fw*w, fh*h);
+        };
         // Sombra
-        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.fillStyle = 'rgba(0,0,0,0.32)';
         ctx.beginPath();
-        ctx.ellipse(x+w/2, y+h, w*0.3, h*0.04, 0, 0, Math.PI*2);
+        ctx.ellipse(x+w*0.50, y+h*0.99, w*0.28, h*0.030, 0, 0, Math.PI*2);
         ctx.fill();
-
-        // Alas de águila en los brazos (animadas)
-        ctx.fillStyle = C(200,185,150, br);
-        // Ala izquierda
-        ctx.fillRect(x-wingFlap, y+h*0.25, w*0.22, h*0.35);
-        // Ala derecha
-        ctx.fillRect(x+w*0.78+wingFlap, y+h*0.25, w*0.22, h*0.35);
-        // Plumas de las alas
-        ctx.fillStyle = C(255,255,255, br);
-        for (let i=0;i<3;i++) {
-            ctx.fillRect(x-wingFlap+w*0.03, y+h*(0.28+i*0.10), w*0.12, h*0.05);
-            ctx.fillRect(x+w*0.85+wingFlap, y+h*(0.28+i*0.10), w*0.12, h*0.05);
+        // Piernas con plumaje blanco/gris
+        R(0.218,0.638,0.248,0.168,  208,205,198);
+        R(0.222,0.642,0.068,0.158,  232,228,222);
+        R(0.534,0.638,0.248,0.168,  208,205,198);
+        // Plumas en piernas
+        for(let i=0;i<3;i++){
+            R(0.222+i*0.062,0.665,0.045,0.085, 188,185,178);
+            R(0.536+i*0.062,0.668,0.042,0.082, 188,185,178);
         }
-
-        // Piernas con plumas blancas
-        ctx.fillStyle = C(220,200,160, br);
-        ctx.fillRect(x+w*0.20, y+h*0.65, w*0.25, h*0.30+walk);
-        ctx.fillRect(x+w*0.55, y+h*0.65, w*0.25, h*0.30-walk);
-        // Plumas en las piernas
-        ctx.fillStyle = C(255,255,255, br);
-        ctx.fillRect(x+w*0.20, y+h*0.68, w*0.25, h*0.05);
-        ctx.fillRect(x+w*0.55, y+h*0.68, w*0.25, h*0.05);
-
-        // Torso — peto con plumas
-        ctx.fillStyle = C(220,200,160, br);
-        ctx.fillRect(x+w*0.20, y+h*0.28, w*0.60, h*0.38);
-        // Plumas decorativas en el peto
-        ctx.fillStyle = C(255,255,255, br);
-        for (let i=0;i<3;i++)
-            ctx.fillRect(x+w*(0.28+i*0.15), y+h*0.32, w*0.10, h*0.14);
-
-        // Arma — atlatl (lanzajabalinas) del águila
-        ctx.fillStyle = C(150,100,50, br);
-        ctx.fillRect(x+w*0.83, y+h*0.25, w*0.08, h*0.50);
-        ctx.fillStyle = C(255,215,0, br);
-        ctx.fillRect(x+w*0.85, y+h*0.22, w*0.06, h*0.06);
-        // Dardo
-        ctx.fillStyle = C(180,190,210, br);
-        ctx.fillRect(x+w*0.86, y+h*0.10, w*0.04, h*0.14);
-
-        // CASCO DE ÁGUILA — pico y cabeza del ave
-        // Parte trasera de la cabeza del águila
-        ctx.fillStyle = C(255,255,255, br);
-        ctx.fillRect(x+w*0.20, y, w*0.60, h*0.24);
-        // Pico del águila (sobresale a la derecha)
-        ctx.fillStyle = C(255,215,0, br);
-        const pikePts = [[x+w*0.80, y+h*0.10], [x+w*0.92, y+h*0.15], [x+w*0.80, y+h*0.20]];
-        ctx.beginPath(); ctx.moveTo(...pikePts[0]); ctx.lineTo(...pikePts[1]); ctx.lineTo(...pikePts[2]); ctx.fill();
-        // Ojo del águila
-        ctx.fillStyle = C(200,20,20, br);
-        ctx.fillRect(x+w*0.70, y+h*0.10, w*0.10, h*0.06);
-        ctx.fillStyle = C(0,0,0, br);
-        ctx.fillRect(x+w*0.74, y+h*0.11, w*0.04, h*0.04);
-        // Cara interior del guerrero
-        ctx.fillStyle = C(200,170,120, br);
-        ctx.fillRect(x+w*0.32, y+h*0.08, w*0.34, h*0.16);
-        ctx.fillStyle = C(30,20,10, br);
-        ctx.fillRect(x+w*0.37, y+h*0.12, w*0.08, h*0.05);
-        ctx.fillRect(x+w*0.55, y+h*0.12, w*0.08, h*0.05);
+        // Garras de águila (amarillo oscuro)
+        R(0.205,0.898,0.278,0.042,  148,112,18);
+        R(0.205,0.935,0.278,0.025,  112,82,12);
+        for(let i=0;i<3;i++){
+            R(0.218+i*0.065,0.928,0.032,0.035, 168,132,22);
+            R(0.518+i*0.065,0.928,0.032,0.035, 168,132,22);
+        }
+        // Torso — armadura de plumas blancas
+        R(0.212,0.285,0.576,0.340,  208,205,198);
+        R(0.216,0.288,0.072,0.332,  235,232,226);
+        R(0.705,0.288,0.055,0.332,  172,168,162);
+        // Capas de plumas en torso (escalonadas)
+        for(let i=0;i<4;i++){
+            const fy=0.295+i*0.072;
+            R(0.222,fy,0.560,0.055, 195,192,186);
+            R(0.226,fy+0.003,0.145,0.038, 218,215,208);
+            R(0.226+0.152,fy+0.003,0.145,0.038, 208,205,198);
+            R(0.226+0.304,fy+0.003,0.145,0.038, 198,195,188);
+            R(0.226+0.410,fy+0.003,0.125,0.038, 188,185,178);
+        }
+        // Cinturón dorado
+        R(0.218,0.618,0.564,0.030,  148,118,18);
+        R(0.445,0.618,0.110,0.030,  235,195,22);
+        // Hombreras plumaje
+        R(0.055,0.258,0.185,0.105,  208,205,198);
+        R(0.058,0.262,0.055,0.090,  235,232,226);
+        R(0.760,0.258,0.185,0.105,  208,205,198);
+        R(0.835,0.262,0.055,0.090,  235,232,226);
+        // Capas de pluma en hombros
+        for(let i=0;i<3;i++){
+            R(0.060+i*0.038,0.335+i*0.010,0.162-i*0.020,0.025, 185,182,175);
+            R(0.762+i*0.018,0.335+i*0.010,0.162-i*0.025,0.025, 185,182,175);
+        }
+        // Brazos
+        R(0.055,0.352,0.152,0.135,  195,192,185);
+        R(0.060,0.355,0.048,0.128,  225,222,215);
+        R(0.044,0.472,0.165,0.042,  148,118,18);
+        R(0.058,0.510,0.138,0.108,  195,192,185);
+        R(0.793,0.352,0.152,0.135,  195,192,185);
+        R(0.850,0.355,0.048,0.128,  225,222,215);
+        R(0.791,0.472,0.165,0.042,  148,118,18);
+        R(0.804,0.510,0.138,0.108,  195,192,185);
+        // Brazaletes dorados
+        R(0.040,0.495,0.178,0.040,  218,178,20);
+        R(0.044,0.499,0.085,0.028,  248,212,55);
+        R(0.782,0.495,0.178,0.040,  218,178,20);
+        R(0.786,0.499,0.085,0.028,  248,212,55);
+        // Macuahuitl con plumas
+        R(0.830,0.180,0.098,0.060,  148,118,18);
+        R(0.834,0.183,0.050,0.050,  178,148,28);
+        R(0.816,0.230,0.062,0.392,  28,22,42);
+        R(0.820,0.233,0.022,0.385,  45,40,65);
+        for(let i=0;i<4;i++){
+            R(0.804,0.240+i*0.090,0.020,0.060, 195,192,228);
+            R(0.876,0.243+i*0.090,0.020,0.054, 182,178,215);
+        }
+        // CASCO ÁGUILA — pico y corona de plumas
+        // Plumas de la corona (abanico)
+        const plumasAguilaX=[0.220,0.298,0.368,0.438,0.508,0.578,0.648,0.718];
+        const plumasAguilaY=[-0.088,-0.115,-0.130,-0.138,-0.138,-0.130,-0.115,-0.088];
+        plumasAguilaX.forEach((fx,i)=>{
+            const sw=Math.sin(t*2.8+i*0.6)*w*0.012;
+            ctx.fillStyle = i%2===0 ? B(208,205,198) : B(225,192,28);
+            ctx.fillRect(x+w*fx+sw, y+h*plumasAguilaY[i], w*0.068, h*0.148);
+            ctx.fillStyle = i%2===0 ? B(168,165,158) : B(178,148,18);
+            ctx.fillRect(x+w*fx+sw+w*0.028, y+h*plumasAguilaY[i], w*0.014, h*0.148);
+        });
+        // Cabeza del casco (águila)
+        R(0.205,0.002,0.590,0.298,  208,205,198);
+        R(0.208,0.005,0.082,0.288,  235,232,226);
+        R(0.702,0.005,0.058,0.288,  172,168,162);
+        // Pico del águila (amarillo prominente)
+        R(0.165,0.148,0.165,0.060,  215,172,18);
+        R(0.168,0.152,0.145,0.035,  242,208,28);
+        R(0.165,0.205,0.155,0.038,  178,138,12);
+        R(0.168,0.208,0.135,0.025,  215,172,18);
+        // Cara interior
+        R(0.298,0.065,0.404,0.218,  195,158,108);
+        R(0.302,0.068,0.098,0.208,  215,178,128);
+        // Ojos (dorados brillantes)
+        R(0.322,0.108,0.132,0.025,  18,14,6);
+        R(0.548,0.108,0.132,0.025,  18,14,6);
+        R(0.335,0.112,0.095,0.042,  228,188,22);
+        R(0.560,0.112,0.095,0.042,  228,188,22);
+        R(0.362,0.118,0.038,0.028,  8,6,2);
+        R(0.576,0.118,0.038,0.028,  8,6,2);
+        R(0.337,0.115,0.018,0.015,  255,252,210);
+        R(0.562,0.115,0.018,0.015,  255,252,210);
+        // Pintura de guerra azul
+        R(0.298,0.148,0.404,0.025,  18,78,195);
+        R(0.298,0.172,0.125,0.018,  14,62,165);
+        R(0.577,0.172,0.125,0.018,  14,62,165);
     }
 };
 
@@ -621,87 +739,130 @@ SKINS.aguila = {
 // ══════════════════════════════════════════════════════════════════════════
 SKINS.sacerdote = {
     nombre: 'Sacerdote Guerrero',
-    piel:     [100,  60, 140],
-    armadura: [ 60,  40,  80],
-    penacho:  [136,  68, 204],
-
     draw(ctx, x, y, w, h, t, bright) {
         const br = bright;
-        const walk = Math.sin(t*8) * h * 0.05;
-        // Aura mágica pulsante
-        const aura = 0.5 + 0.5*Math.sin(t*5);
-        ctx.fillStyle = `rgba(136,68,204,${aura*0.3*br})`;
-        ctx.beginPath();
-        ctx.ellipse(x+w/2, y+h*0.5, w*0.6, h*0.55, 0, 0, Math.PI*2);
-        ctx.fill();
-
+        const B  = (r,g,b) => C(r,g,b,br);
+        const R  = (fx,fy,fw,fh,r,g,b) => {
+            ctx.fillStyle = B(r,g,b);
+            ctx.fillRect(x+fx*w, y+fy*h, fw*w, fh*h);
+        };
         // Sombra
-        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.fillStyle = 'rgba(0,0,0,0.32)';
         ctx.beginPath();
-        ctx.ellipse(x+w/2, y+h, w*0.3, h*0.04, 0, 0, Math.PI*2);
+        ctx.ellipse(x+w*0.50, y+h*0.99, w*0.28, h*0.030, 0, 0, Math.PI*2);
         ctx.fill();
-
-        // Túnica larga morada
-        ctx.fillStyle = C(60,40,80, br);
-        ctx.fillRect(x+w*0.15, y+h*0.28, w*0.70, h*0.72);
-        // Borde dorado de la túnica
-        ctx.fillStyle = C(255,215,0, br);
-        ctx.fillRect(x+w*0.15, y+h*0.28, w*0.04, h*0.72);
-        ctx.fillRect(x+w*0.81, y+h*0.28, w*0.04, h*0.72);
-        ctx.fillRect(x+w*0.15, y+h*0.95, w*0.70, h*0.04);
-
-        // Piernas asoman debajo de la túnica
-        ctx.fillStyle = C(60,40,80, br);
-        ctx.fillRect(x+w*0.25, y+h*0.80, w*0.22, h*0.20+walk);
-        ctx.fillRect(x+w*0.53, y+h*0.80, w*0.22, h*0.20-walk);
-
-        // Brazos con mangas
-        ctx.fillStyle = C(60,40,80, br);
-        ctx.fillRect(x+w*0.00, y+h*0.30, w*0.18, h*0.36);
-        ctx.fillRect(x+w*0.82, y+h*0.30, w*0.18, h*0.36);
-
-        // Manos con glyphicons mágicos
-        ctx.fillStyle = C(100,60,140, br);
-        ctx.fillRect(x+w*0.00, y+h*0.62, w*0.18, h*0.10);
-        ctx.fillRect(x+w*0.82, y+h*0.62, w*0.18, h*0.10);
-        // Glifos mágicos en las manos
-        ctx.fillStyle = `rgba(200,180,255,${(0.7+0.3*Math.sin(t*6))*br})`;
-        ctx.fillRect(x+w*0.03, y+h*0.63, w*0.12, h*0.03);
-        ctx.fillRect(x+w*0.85, y+h*0.63, w*0.12, h*0.03);
-
-        // Báculo en mano derecha con cristal
-        ctx.fillStyle = C(80,50,20, br);
-        ctx.fillRect(x+w*0.86, y+h*0.05, w*0.06, h*0.62);
-        // Cristal pulsante en la punta
-        ctx.fillStyle = `rgba(200,100,255,${(0.7+0.3*Math.sin(t*8))*br})`;
-        ctx.fillRect(x+w*0.83, y+h*0.01, w*0.12, h*0.08);
-        ctx.fillStyle = C(255,255,255, br);
-        ctx.fillRect(x+w*0.87, y+h*0.02, w*0.05, h*0.04);
-
-        // Cabeza
-        ctx.fillStyle = C(100,60,140, br);
-        ctx.fillRect(x+w*0.28, y+h*0.05, w*0.44, h*0.24);
-
-        // Corona de espinas/plumas rituales
-        ctx.fillStyle = C(255,215,0, br);
-        for (let i=0;i<5;i++) {
-            const swing = Math.sin(t*2+i)*w*0.01;
-            ctx.fillRect(x+w*(0.30+i*0.08)+swing, y-h*0.04, w*0.05, h*0.10);
+        // Piernas túnica morada
+        R(0.215,0.635,0.252,0.172,  75,42,118);
+        R(0.220,0.638,0.068,0.162,  98,58,148);
+        R(0.533,0.635,0.252,0.172,  75,42,118);
+        R(0.536,0.638,0.068,0.162,  98,58,148);
+        // Bordado dorado en túnica
+        R(0.215,0.698,0.252,0.015,  218,178,20);
+        R(0.215,0.758,0.252,0.015,  218,178,20);
+        R(0.533,0.698,0.252,0.015,  218,178,20);
+        R(0.533,0.758,0.252,0.015,  218,178,20);
+        // Sandalias
+        R(0.202,0.895,0.282,0.042,  52,35,18);
+        R(0.202,0.932,0.282,0.025,  35,22,8);
+        R(0.518,0.895,0.282,0.042,  52,35,18);
+        R(0.518,0.932,0.282,0.025,  35,22,8);
+        // Cinturón con glifo
+        R(0.215,0.615,0.570,0.028,  48,28,88);
+        R(0.442,0.615,0.116,0.028,  218,178,20);
+        R(0.460,0.617,0.078,0.022,  245,210,55);
+        // Torso — túnica con decoraciones
+        R(0.210,0.282,0.580,0.338,  75,42,118);
+        R(0.214,0.285,0.072,0.330,  98,58,148);
+        R(0.708,0.285,0.055,0.330,  52,28,88);
+        // Bordes dorados del torso
+        R(0.210,0.282,0.580,0.015,  218,178,20);
+        R(0.210,0.592,0.580,0.015,  218,178,20);
+        R(0.210,0.282,0.015,0.325,  218,178,20);
+        R(0.775,0.282,0.015,0.325,  218,178,20);
+        // Glifo central (ojo de la muerte)
+        R(0.395,0.335,0.210,0.210,  48,28,88);
+        ctx.fillStyle = B(218,178,20);
+        ctx.beginPath(); ctx.arc(x+w*0.500, y+h*0.440, w*0.085, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = B(48,28,88);
+        ctx.beginPath(); ctx.arc(x+w*0.500, y+h*0.440, w*0.055, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = B(218,178,20);
+        ctx.beginPath(); ctx.arc(x+w*0.500, y+h*0.440, w*0.025, 0, Math.PI*2); ctx.fill();
+        R(0.462,0.335,0.076,0.210,  218,178,20);
+        R(0.395,0.400,0.210,0.076,  218,178,20);
+        // Hombreras con calaveras
+        R(0.055,0.255,0.190,0.108,  75,42,118);
+        R(0.058,0.258,0.058,0.095,  98,58,148);
+        R(0.060,0.255,0.190,0.018,  218,178,20);
+        R(0.060,0.355,0.190,0.015,  218,178,20);
+        R(0.755,0.255,0.190,0.108,  75,42,118);
+        R(0.835,0.258,0.058,0.095,  98,58,148);
+        R(0.755,0.255,0.190,0.018,  218,178,20);
+        R(0.755,0.355,0.190,0.015,  218,178,20);
+        // Calavera en hombrera
+        ctx.fillStyle = B(235,228,215);
+        ctx.beginPath(); ctx.arc(x+w*0.148, y+h*0.298, w*0.040, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = B(75,42,118);
+        ctx.fillRect(x+w*0.126,y+h*0.312,w*0.022,w*0.022);
+        ctx.fillRect(x+w*0.152,y+h*0.312,w*0.022,w*0.022);
+        ctx.fillStyle = B(235,228,215);
+        ctx.beginPath(); ctx.arc(x+w*0.852, y+h*0.298, w*0.040, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = B(75,42,118);
+        ctx.fillRect(x+w*0.830,y+h*0.312,w*0.022,w*0.022);
+        ctx.fillRect(x+w*0.856,y+h*0.312,w*0.022,w*0.022);
+        // Brazos con túnica
+        R(0.052,0.348,0.155,0.138,  75,42,118);
+        R(0.056,0.352,0.055,0.130,  98,58,148);
+        R(0.040,0.468,0.168,0.045,  48,28,88);
+        R(0.055,0.508,0.140,0.108,  75,42,118);
+        R(0.793,0.348,0.155,0.138,  75,42,118);
+        R(0.848,0.352,0.055,0.130,  98,58,148);
+        R(0.792,0.468,0.168,0.045,  48,28,88);
+        R(0.805,0.508,0.140,0.108,  75,42,118);
+        // Brazaletes dorados
+        R(0.038,0.492,0.180,0.042,  218,178,20);
+        R(0.042,0.496,0.088,0.028,  248,215,55);
+        R(0.782,0.492,0.180,0.042,  218,178,20);
+        R(0.786,0.496,0.088,0.028,  248,215,55);
+        // Bastón ceremonial (mano derecha)
+        R(0.828,0.050,0.058,0.620,  88,55,18);
+        R(0.832,0.053,0.022,0.608,  112,72,25);
+        // Cabeza de serpiente en el bastón
+        R(0.808,0.038,0.098,0.048,  18,138,72);
+        R(0.812,0.042,0.068,0.032,  22,168,88);
+        R(0.808,0.068,0.018,0.015,  225,185,20); // ojo
+        R(0.878,0.068,0.018,0.015,  225,185,20);
+        // Banda dorada en el bastón
+        for(let i=0;i<5;i++) R(0.828,0.120+i*0.105,0.058,0.018, 218,178,20);
+        // Cabeza — cráneo pintado
+        R(0.292,0.058,0.416,0.245,  175,128,72);
+        R(0.296,0.062,0.102,0.235,  205,155,92);
+        // Pintura de calavera en la cara
+        R(0.292,0.098,0.416,0.188,  18,12,8);  // fondo negro
+        R(0.298,0.102,0.404,0.180,  18,12,8);
+        // Órbitas
+        R(0.318,0.108,0.132,0.082,  175,128,72);
+        R(0.550,0.108,0.132,0.082,  175,128,72);
+        ctx.fillStyle = B(18,12,8);
+        ctx.beginPath(); ctx.arc(x+w*0.384, y+h*0.152, w*0.052, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x+w*0.616, y+h*0.152, w*0.052, 0, Math.PI*2); ctx.fill();
+        // Ojos brillantes (violeta)
+        ctx.fillStyle = B(178,42,225);
+        ctx.beginPath(); ctx.arc(x+w*0.384, y+h*0.152, w*0.030, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x+w*0.616, y+h*0.152, w*0.030, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = B(225,125,255);
+        ctx.beginPath(); ctx.arc(x+w*0.384, y+h*0.152, w*0.015, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x+w*0.616, y+h*0.152, w*0.015, 0, Math.PI*2); ctx.fill();
+        // Dientes pintados en cara
+        for(let i=0;i<6;i++) R(0.330+i*0.058,0.230,0.040,0.025, 195,188,175);
+        // Tocado de sacerdote
+        R(0.322,0.008,0.356,0.062,  48,28,88);
+        R(0.285,-0.012,0.430,0.028,  218,178,20);
+        R(0.322,-0.032,0.356,0.028,  75,42,118);
+        // Borlas doradas del tocado
+        for(let i=0;i<5;i++){
+            ctx.fillStyle = B(218,178,20);
+            ctx.beginPath(); ctx.arc(x+w*(0.338+i*0.072), y-h*0.042, w*0.022, 0, Math.PI*2); ctx.fill();
         }
-        // Gemas en la corona
-        ctx.fillStyle = `rgba(255,50,50,${br})`;
-        ctx.fillRect(x+w*0.48, y-h*0.02, w*0.06, h*0.05);
-
-        // Calavera ritual pintada en la cara
-        ctx.fillStyle = C(255,255,255, br);
-        ctx.fillRect(x+w*0.32, y+h*0.10, w*0.36, h*0.12);
-        // Ojos negros de calavera
-        ctx.fillStyle = C(10,10,10, br);
-        ctx.fillRect(x+w*0.36, y+h*0.11, w*0.10, h*0.08);
-        ctx.fillRect(x+w*0.54, y+h*0.11, w*0.10, h*0.08);
-        // Dientes
-        for (let i=0;i<4;i++)
-            ctx.fillRect(x+w*(0.37+i*0.07), y+h*0.20, w*0.05, h*0.04);
     }
 };
 
@@ -710,89 +871,118 @@ SKINS.sacerdote = {
 // ══════════════════════════════════════════════════════════════════════════
 SKINS.tlaloc = {
     nombre: 'Guerrero de Tláloc',
-    piel:     [ 60, 100, 180],
-    armadura: [ 40,  80, 140],
-    penacho:  [ 34, 136, 204],
-
     draw(ctx, x, y, w, h, t, bright) {
         const br = bright;
-        const walk = Math.sin(t*8) * h * 0.05;
-        // Aura de lluvia (gotas)
-        for (let i=0;i<6;i++) {
-            const drop = (t*3 + i*1.05) % 1;
-            ctx.fillStyle = `rgba(100,180,255,${(1-drop)*0.4*br})`;
-            ctx.fillRect(x+w*(0.1+i*0.13), y+h*(drop*1.2)-h*0.1, 2, h*0.10);
-        }
-
+        const B  = (r,g,b) => C(r,g,b,br);
+        const R  = (fx,fy,fw,fh,r,g,b) => {
+            ctx.fillStyle = B(r,g,b);
+            ctx.fillRect(x+fx*w, y+fy*h, fw*w, fh*h);
+        };
         // Sombra
-        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.fillStyle = 'rgba(0,0,0,0.32)';
         ctx.beginPath();
-        ctx.ellipse(x+w/2, y+h, w*0.3, h*0.04, 0, 0, Math.PI*2);
+        ctx.ellipse(x+w*0.50, y+h*0.99, w*0.28, h*0.030, 0, 0, Math.PI*2);
         ctx.fill();
-
-        // Piernas — armadura azul-turquesa
-        ctx.fillStyle = C(40,80,140, br);
-        ctx.fillRect(x+w*0.20, y+h*0.65, w*0.25, h*0.30+walk);
-        ctx.fillRect(x+w*0.55, y+h*0.65, w*0.25, h*0.30-walk);
-        // Espirales de Tláloc
-        ctx.fillStyle = C(100,180,255, br);
-        ctx.fillRect(x+w*0.22, y+h*0.70, w*0.08, h*0.04);
-        ctx.fillRect(x+w*0.57, y+h*0.70, w*0.08, h*0.04);
-
-        // Torso con escamas de serpiente
-        ctx.fillStyle = C(40,80,140, br);
-        ctx.fillRect(x+w*0.18, y+h*0.28, w*0.64, h*0.38);
-        // Escamas
-        ctx.fillStyle = C(60,120,200, br);
-        for (let row=0;row<3;row++)
-            for (let col=0;col<4;col++)
-                ctx.fillRect(x+w*(0.22+col*0.14), y+h*(0.32+row*0.10), w*0.12, h*0.07);
-
+        // Piernas azul tormenta
+        R(0.218,0.638,0.248,0.168,  28,72,168);
+        R(0.222,0.642,0.068,0.158,  38,92,198);
+        R(0.534,0.638,0.248,0.168,  28,72,168);
+        // Escamas/gotas de lluvia
+        for(let i=0;i<4;i++){
+            R(0.225+i*0.052,0.658,0.038,0.055, 18,52,138);
+            R(0.538+i*0.052,0.660,0.038,0.052, 18,52,138);
+        }
+        // Botas
+        R(0.205,0.898,0.278,0.042,  18,42,108);
+        R(0.205,0.935,0.278,0.025,  12,28,78);
+        R(0.518,0.898,0.278,0.042,  18,42,108);
+        R(0.518,0.935,0.278,0.025,  12,28,78);
+        // Cinturón turquesa
+        R(0.218,0.615,0.564,0.028,  0,158,155);
+        R(0.442,0.615,0.116,0.028,  0,198,195);
+        // Torso — armadura de agua
+        R(0.210,0.282,0.580,0.338,  28,72,168);
+        R(0.214,0.285,0.072,0.330,  38,92,198);
+        R(0.708,0.285,0.055,0.330,  18,52,138);
+        // Patrón de olas en torso
+        for(let i=0;i<3;i++){
+            R(0.218,0.308+i*0.095,0.564,0.018, 0,158,155);
+        }
+        // Máscara de Tláloc en el pecho (círculos concéntricos)
+        ctx.fillStyle = B(0,158,155);
+        ctx.beginPath(); ctx.arc(x+w*0.500, y+h*0.440, w*0.095, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = B(28,72,168);
+        ctx.beginPath(); ctx.arc(x+w*0.500, y+h*0.440, w*0.065, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = B(0,198,195);
+        ctx.beginPath(); ctx.arc(x+w*0.500, y+h*0.440, w*0.038, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = B(18,52,138);
+        ctx.beginPath(); ctx.arc(x+w*0.500, y+h*0.440, w*0.018, 0, Math.PI*2); ctx.fill();
+        // Hombreras azul
+        R(0.055,0.255,0.190,0.108,  28,72,168);
+        R(0.058,0.258,0.058,0.095,  38,92,198);
+        R(0.060,0.255,0.190,0.015,  0,198,195);
+        R(0.060,0.355,0.190,0.015,  0,198,195);
+        R(0.755,0.255,0.190,0.108,  28,72,168);
+        R(0.835,0.258,0.058,0.095,  38,92,198);
+        R(0.755,0.255,0.190,0.015,  0,198,195);
+        R(0.755,0.355,0.190,0.015,  0,198,195);
         // Brazos
-        ctx.fillStyle = C(60,100,180, br);
-        ctx.fillRect(x+w*0.03, y+h*0.28, w*0.15, h*0.34);
-        ctx.fillRect(x+w*0.82, y+h*0.28, w*0.15, h*0.34);
-
-        // Arco de lluvia
-        ctx.strokeStyle = C(40,80,140, br);
-        ctx.lineWidth = Math.max(3, w*0.08);
-        ctx.beginPath();
-        ctx.arc(x+w*0.84, y+h*0.55, h*0.35, -Math.PI*0.7, Math.PI*0.7);
-        ctx.stroke();
-        // Cuerda del arco
-        ctx.strokeStyle = C(200,220,255, br);
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(x+w*0.84, y+h*0.20);
-        ctx.lineTo(x+w*0.84, y+h*0.90);
-        ctx.stroke();
-        // Flecha
-        ctx.fillStyle = C(180,190,210, br);
-        ctx.fillRect(x+w*0.82, y+h*0.16, w*0.06, h*0.12);
-
-        // MÁSCARA DE TLÁLOC — ojos de serpiente
-        ctx.fillStyle = C(40,80,140, br);
-        ctx.fillRect(x+w*0.22, y, w*0.56, h*0.28);
-        // Ojo derecho de Tláloc (círculo concéntrico)
-        ctx.fillStyle = C(0,200,255, br);
-        ctx.beginPath(); ctx.arc(x+w*0.38, y+h*0.12, w*0.09, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = C(0,80,160, br);
-        ctx.beginPath(); ctx.arc(x+w*0.38, y+h*0.12, w*0.05, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = C(0,220,255, br);
-        ctx.beginPath(); ctx.arc(x+w*0.38, y+h*0.12, w*0.02, 0, Math.PI*2); ctx.fill();
-        // Ojo izquierdo
-        ctx.fillStyle = C(0,200,255, br);
-        ctx.beginPath(); ctx.arc(x+w*0.62, y+h*0.12, w*0.09, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = C(0,80,160, br);
-        ctx.beginPath(); ctx.arc(x+w*0.62, y+h*0.12, w*0.05, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = C(0,220,255, br);
-        ctx.beginPath(); ctx.arc(x+w*0.62, y+h*0.12, w*0.02, 0, Math.PI*2); ctx.fill();
-        // Boca de serpiente
-        ctx.fillStyle = C(0,150,220, br);
-        ctx.fillRect(x+w*0.30, y+h*0.20, w*0.40, h*0.06);
-        ctx.fillStyle = C(255,255,255, br);
-        for (let i=0;i<4;i++)
-            ctx.fillRect(x+w*(0.33+i*0.09), y+h*0.20, w*0.04, h*0.06);
+        R(0.055,0.352,0.152,0.135,  28,72,168);
+        R(0.060,0.355,0.048,0.128,  38,92,198);
+        R(0.044,0.472,0.165,0.042,  0,158,155);
+        R(0.058,0.510,0.138,0.108,  28,72,168);
+        R(0.793,0.352,0.152,0.135,  28,72,168);
+        R(0.850,0.355,0.048,0.128,  38,92,198);
+        R(0.791,0.472,0.165,0.042,  0,158,155);
+        R(0.804,0.510,0.138,0.108,  28,72,168);
+        // Brazaletes turquesa
+        R(0.038,0.492,0.180,0.042,  0,178,175);
+        R(0.782,0.492,0.180,0.042,  0,178,175);
+        // Atlatl (lanzadardos de Tláloc)
+        R(0.825,0.175,0.102,0.065,  0,158,155);
+        R(0.830,0.178,0.055,0.052,  0,198,195);
+        R(0.815,0.230,0.065,0.388,  18,52,138);
+        R(0.819,0.233,0.025,0.378,  28,72,168);
+        // Dardos
+        R(0.800,0.175,0.025,0.175,  0,198,195);
+        R(0.875,0.180,0.022,0.165,  0,178,155);
+        // Punta del dardo
+        R(0.794,0.168,0.038,0.015,  235,225,205);
+        R(0.869,0.173,0.035,0.015,  235,225,205);
+        // Cabeza — MÁSCARA DE TLÁLOC
+        R(0.288,0.058,0.424,0.248,  28,72,168);
+        R(0.292,0.062,0.102,0.238,  38,92,198);
+        // Anteojeras características de Tláloc (círculos alrededor de los ojos)
+        ctx.fillStyle = B(0,198,195);
+        ctx.beginPath(); ctx.arc(x+w*0.375, y+h*0.155, w*0.065, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x+w*0.625, y+h*0.155, w*0.065, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = B(28,72,168);
+        ctx.beginPath(); ctx.arc(x+w*0.375, y+h*0.155, w*0.045, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x+w*0.625, y+h*0.155, w*0.045, 0, Math.PI*2); ctx.fill();
+        // Ojos (azul eléctrico)
+        ctx.fillStyle = B(125,208,255);
+        ctx.beginPath(); ctx.arc(x+w*0.375, y+h*0.155, w*0.028, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x+w*0.625, y+h*0.155, w*0.028, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = B(8,8,18);
+        ctx.beginPath(); ctx.arc(x+w*0.375, y+h*0.155, w*0.014, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x+w*0.625, y+h*0.155, w*0.014, 0, Math.PI*2); ctx.fill();
+        // Colmillos de la máscara
+        R(0.322,0.238,0.045,0.042,  235,228,215);
+        R(0.632,0.238,0.045,0.042,  235,228,215);
+        R(0.388,0.242,0.032,0.035,  235,228,215);
+        R(0.580,0.242,0.032,0.035,  235,228,215);
+        // Nariz decorada
+        R(0.445,0.175,0.110,0.048,  0,158,155);
+        R(0.452,0.178,0.062,0.030,  0,198,195);
+        // Tocado de nubes/lluvia
+        R(0.255,-0.005,0.490,0.072,  28,72,168);
+        R(0.258,-0.002,0.118,0.058,  38,92,198);
+        // Espirales de lluvia en el tocado
+        for(let i=0;i<5;i++){
+            const sw=Math.sin(t*2.5+i*0.8)*w*0.010;
+            R(0.272+i*0.092,0.002,0.065,0.052+sw*0.015, 0,198,195);
+            R(0.278+i*0.092,0.005,0.030,0.038, 125,208,255);
+        }
     }
 };
 
@@ -801,107 +991,135 @@ SKINS.tlaloc = {
 // ══════════════════════════════════════════════════════════════════════════
 SKINS.quetzalcoatl = {
     nombre: 'Serpiente Emplumada',
-    piel:     [220, 200,  40],
-    armadura: [180, 160,  20],
-    penacho:  [ 50, 200,  50],
-
     draw(ctx, x, y, w, h, t, bright) {
         const br = bright;
-        const walk = Math.sin(t*8) * h * 0.05;
-        // Aura dorada radiante
-        const aura = 0.4+0.4*Math.sin(t*4);
-        ctx.fillStyle = `rgba(255,215,0,${aura*0.25*br})`;
-        ctx.beginPath();
-        ctx.ellipse(x+w/2, y+h*0.5, w*0.7, h*0.6, 0, 0, Math.PI*2);
-        ctx.fill();
-
+        const B  = (r,g,b) => C(r,g,b,br);
+        const R  = (fx,fy,fw,fh,r,g,b) => {
+            ctx.fillStyle = B(r,g,b);
+            ctx.fillRect(x+fx*w, y+fy*h, fw*w, fh*h);
+        };
         // Sombra
-        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.fillStyle = 'rgba(0,0,0,0.32)';
         ctx.beginPath();
-        ctx.ellipse(x+w/2, y+h, w*0.3, h*0.04, 0, 0, Math.PI*2);
+        ctx.ellipse(x+w*0.50, y+h*0.99, w*0.28, h*0.030, 0, 0, Math.PI*2);
         ctx.fill();
-
-        // Plumas iridiscentes (verdes/azules) que salen de los brazos
-        const plumColors = [[0,200,100],[0,150,255],[100,255,100],[255,215,0]];
-        for (let i=0;i<4;i++) {
-            const swing = Math.sin(t*3+i*0.7)*h*0.06;
-            const [r,g,b] = plumColors[i%4];
-            ctx.fillStyle = C(r,g,b,br);
-            ctx.fillRect(x-w*0.10+i*w*0.05, y+h*(0.25+i*0.04)+swing, w*0.12, h*0.30);
-            ctx.fillRect(x+w*(0.90-i*0.05), y+h*(0.25+i*0.04)-swing, w*0.12, h*0.30);
+        // Plumas verdes en piernas
+        R(0.215,0.635,0.255,0.172,  18,155,72);
+        R(0.220,0.638,0.072,0.162,  22,188,88);
+        R(0.530,0.635,0.255,0.172,  18,155,72);
+        // Escamas de serpiente en piernas
+        for(let i=0;i<4;i++){
+            R(0.222+i*0.055,0.655,0.042,0.062, 12,118,52);
+            R(0.534+i*0.055,0.658,0.040,0.058, 12,118,52);
         }
-
-        // Piernas — escamas verdes
-        ctx.fillStyle = C(50,160,50, br);
-        ctx.fillRect(x+w*0.20, y+h*0.65, w*0.25, h*0.30+walk);
-        ctx.fillRect(x+w*0.55, y+h*0.65, w*0.25, h*0.30-walk);
-        // Escamas brillantes
-        ctx.fillStyle = C(100,220,100, br);
-        for (let i=0;i<3;i++) ctx.fillRect(x+w*(0.21+i*0.06), y+h*(0.67+i*0.08), w*0.05, h*0.05);
-
-        // Torso — piel de serpiente dorada
-        ctx.fillStyle = C(220,200,40, br);
-        ctx.fillRect(x+w*0.18, y+h*0.28, w*0.64, h*0.38);
-        // Escamas doradas del torso
-        ctx.fillStyle = C(255,215,0, br);
-        for (let row=0;row<3;row++)
-            for (let col=0;col<4;col++) {
-                ctx.beginPath();
-                ctx.ellipse(x+w*(0.24+col*0.14), y+h*(0.34+row*0.11), w*0.06, h*0.04, 0, 0, Math.PI*2);
-                ctx.fill();
+        // Garras doradas
+        R(0.202,0.895,0.282,0.042,  218,175,18);
+        R(0.202,0.932,0.282,0.025,  178,138,12);
+        for(let i=0;i<3;i++){
+            R(0.215+i*0.068,0.928,0.035,0.038, 235,198,22);
+            R(0.516+i*0.068,0.928,0.035,0.038, 235,198,22);
+        }
+        // Cinturón dorado-esmeralda
+        R(0.215,0.612,0.570,0.030,  18,138,62);
+        R(0.440,0.612,0.120,0.030,  225,185,18);
+        R(0.458,0.614,0.082,0.024,  252,218,28);
+        // Torso — escamas verdes iridiscentes
+        R(0.208,0.280,0.584,0.342,  18,155,72);
+        R(0.212,0.283,0.075,0.334,  22,188,88);
+        R(0.708,0.283,0.058,0.334,  12,118,52);
+        // Capas de escamas en torso
+        for(let i=0;i<4;i++){
+            const fy=0.290+i*0.075;
+            R(0.215,fy,0.570,0.055, 15,138,62);
+            for(let j=0;j<5;j++) R(0.222+j*0.108,fy+0.005,0.098,0.038, 18,168,78);
+        }
+        // Glifo de Quetzalcóatl (serpiente emplumada) en pecho
+        ctx.fillStyle = B(218,175,18);
+        ctx.beginPath(); ctx.arc(x+w*0.500, y+h*0.438, w*0.090, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = B(18,155,72);
+        ctx.beginPath(); ctx.arc(x+w*0.500, y+h*0.438, w*0.062, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = B(218,175,18);
+        ctx.beginPath(); ctx.arc(x+w*0.500, y+h*0.438, w*0.032, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = B(12,118,52);
+        ctx.beginPath(); ctx.arc(x+w*0.500, y+h*0.438, w*0.015, 0, Math.PI*2); ctx.fill();
+        // Plumas en hombreras (abanico)
+        const hPlumas=[[0.052,0.255],[0.760,0.255]];
+        hPlumas.forEach(([hx,hy])=>{
+            for(let i=0;i<4;i++){
+                ctx.fillStyle = i%2===0 ? B(18,155,72) : B(218,175,18);
+                ctx.fillRect(x+w*(hx+i*0.040), y+h*hy, w*0.042, h*0.108);
+                ctx.fillStyle = i%2===0 ? B(12,118,52) : B(178,138,12);
+                ctx.fillRect(x+w*(hx+i*0.040)+w*0.018, y+h*hy, w*0.010, h*0.108);
             }
-
-        // Brazos con plumas largas
-        ctx.fillStyle = C(180,160,20, br);
-        ctx.fillRect(x+w*0.03, y+h*0.28, w*0.15, h*0.36);
-        ctx.fillRect(x+w*0.82, y+h*0.28, w*0.15, h*0.36);
-
-        // Bastón con la serpiente enroscada
-        ctx.fillStyle = C(80,50,20, br);
-        ctx.fillRect(x+w*0.87, y+h*0.10, w*0.05, h*0.55);
-        // Serpiente enroscada
-        ctx.strokeStyle = C(0,200,100, br);
-        ctx.lineWidth = Math.max(2, w*0.04);
-        ctx.beginPath();
-        for (let i=0;i<20;i++) {
-            const ty2 = y+h*(0.12+i*0.025);
-            const tx2 = x+w*0.89 + Math.sin(i*0.8+t*4)*w*0.06;
-            if (i===0) ctx.moveTo(tx2,ty2); else ctx.lineTo(tx2,ty2);
-        }
-        ctx.stroke();
-
-        // CABEZA DE SERPIENTE emplumada
-        ctx.fillStyle = C(220,200,40, br);
-        ctx.fillRect(x+w*0.25, y+h*0.03, w*0.50, h*0.25);
-        // Escamas en la cabeza
-        ctx.fillStyle = C(255,215,0, br);
-        ctx.fillRect(x+w*0.30, y+h*0.05, w*0.40, h*0.08);
-        // Penacho enorme de plumas largas
-        const plumasHead = [
-            {x:0.20, y:-0.18, c:[0,200,100]},
-            {x:0.30, y:-0.22, c:[255,215,0]},
-            {x:0.40, y:-0.25, c:[0,150,255]},
-            {x:0.50, y:-0.22, c:[255,50,50]},
-            {x:0.60, y:-0.18, c:[0,200,100]},
-            {x:0.70, y:-0.14, c:[255,215,0]},
-        ];
-        plumasHead.forEach(({x:fx, y:fy, c:[r,g,b]}, i) => {
-            const swing = Math.sin(t*2.5+i*0.6)*w*0.03;
-            ctx.fillStyle = C(r,g,b,br);
-            ctx.fillRect(x+w*fx+swing, y+h*fy, w*0.08, h*0.20);
         });
-        // Ojos de serpiente (verticales)
-        ctx.fillStyle = C(255,215,0, br);
-        ctx.fillRect(x+w*0.34, y+h*0.10, w*0.10, h*0.10);
-        ctx.fillRect(x+w*0.56, y+h*0.10, w*0.10, h*0.10);
-        ctx.fillStyle = C(0,0,0, br);
-        ctx.fillRect(x+w*0.38, y+h*0.10, w*0.03, h*0.10); // pupila vertical
-        ctx.fillRect(x+w*0.60, y+h*0.10, w*0.03, h*0.10);
+        // Brazos con escamas
+        R(0.052,0.350,0.155,0.138,  18,155,72);
+        R(0.056,0.353,0.052,0.130,  22,188,88);
+        R(0.040,0.470,0.168,0.044,  218,175,18);
+        R(0.055,0.508,0.140,0.108,  18,155,72);
+        R(0.793,0.350,0.155,0.138,  18,155,72);
+        R(0.850,0.353,0.052,0.130,  22,188,88);
+        R(0.789,0.470,0.168,0.044,  218,175,18);
+        R(0.805,0.508,0.140,0.108,  18,155,72);
+        // Brazaletes dorado-jade
+        R(0.035,0.490,0.182,0.044,  218,175,18);
+        R(0.040,0.494,0.088,0.030,  252,215,28);
+        R(0.783,0.490,0.182,0.044,  218,175,18);
+        R(0.788,0.494,0.088,0.030,  252,215,28);
+        // Macuahuitl con plumas quetzal
+        R(0.828,0.178,0.098,0.062,  218,175,18);
+        R(0.832,0.181,0.052,0.052,  252,215,28);
+        R(0.814,0.228,0.064,0.394,  18,155,72);
+        R(0.818,0.231,0.025,0.386,  22,188,88);
+        for(let i=0;i<4;i++){
+            R(0.802,0.238+i*0.090,0.022,0.062, 198,195,232);
+            R(0.876,0.241+i*0.090,0.022,0.055, 185,182,218);
+        }
+        // CABEZA — máscara de serpiente emplumada
+        // Gran abanico de plumas (corona)
+        const nPl=9;
+        for(let i=0;i<nPl;i++){
+            const ang=(i/(nPl-1)-0.5)*1.1;
+            const px=0.500+Math.sin(ang)*0.320;
+            const py=0.050-Math.abs(Math.cos(ang))*0.155;
+            const sw=Math.sin(t*2.2+i*0.7)*w*0.012;
+            ctx.fillStyle = i%2===0 ? B(18,155,72) : B(218,175,18);
+            ctx.fillRect(x+w*px-w*0.025+sw, y+h*py-h*0.125, w*0.052, h*0.155);
+            ctx.fillStyle = i%2===0 ? B(12,118,52) : B(178,138,12);
+            ctx.fillRect(x+w*px-w*0.003+sw, y+h*py-h*0.125, w*0.012, h*0.155);
+        }
+        // Cabeza base
+        R(0.285,0.055,0.430,0.252,  18,155,72);
+        R(0.290,0.058,0.108,0.242,  22,188,88);
+        // Máscara con diseño de serpiente
+        R(0.300,0.065,0.400,0.235,  12,118,52);
+        // Escamas en cara
+        for(let i=0;i<3;i++) for(let j=0;j<4;j++)
+            R(0.310+j*0.092,0.072+i*0.065,0.078,0.048, 18,155,72);
+        // Ojos (dorado brillante)
+        R(0.322,0.105,0.135,0.028,  12,88,38);
+        R(0.543,0.105,0.135,0.028,  12,88,38);
+        ctx.fillStyle = B(228,185,18);
+        ctx.beginPath(); ctx.arc(x+w*0.390, y+h*0.152, w*0.038, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x+w*0.610, y+h*0.152, w*0.038, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = B(252,225,28);
+        ctx.beginPath(); ctx.arc(x+w*0.390, y+h*0.152, w*0.022, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x+w*0.610, y+h*0.152, w*0.022, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = B(8,5,2);
+        ctx.beginPath(); ctx.arc(x+w*0.390, y+h*0.152, w*0.012, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x+w*0.610, y+h*0.152, w*0.012, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = B(255,255,220);
+        ctx.beginPath(); ctx.arc(x+w*0.381, y+h*0.146, w*0.008, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x+w*0.601, y+h*0.146, w*0.008, 0, Math.PI*2); ctx.fill();
+        // Colmillos de serpiente
+        R(0.325,0.240,0.048,0.048,  235,228,215);
+        R(0.325,0.272,0.048,0.022,  218,210,198);
+        R(0.625,0.240,0.048,0.048,  235,228,215);
+        R(0.625,0.272,0.048,0.022,  218,210,198);
         // Lengua bífida
-        ctx.fillStyle = C(255,50,50, br);
-        ctx.fillRect(x+w*0.46, y+h*0.26, w*0.08, h*0.04);
-        ctx.fillRect(x+w*0.44, y+h*0.29, w*0.04, h*0.03);
-        ctx.fillRect(x+w*0.52, y+h*0.29, w*0.04, h*0.03);
+        R(0.462,0.275,0.076,0.015,  195,18,18);
+        R(0.455,0.288,0.030,0.015,  175,12,12);
+        R(0.492,0.288,0.030,0.015,  175,12,12);
     }
 };
 
@@ -909,100 +1127,129 @@ SKINS.quetzalcoatl = {
 //  MICTLANTECUHTLI (Señor del Inframundo)
 // ══════════════════════════════════════════════════════════════════════════
 SKINS.mictlantecuhtli = {
-    nombre: 'Señor del Inframundo',
-    piel:     [ 60,  20,  20],
-    armadura: [100,  20,  20],
-    penacho:  [ 80,   0,   0],
-
+    nombre: 'Sr. del Inframundo',
     draw(ctx, x, y, w, h, t, bright) {
         const br = bright;
-        const walk = Math.sin(t*8) * h * 0.05;
-        // Aura oscura / llamas del inframundo
-        for (let i=0;i<5;i++) {
-            const flameH = 0.2+0.1*Math.sin(t*5+i*1.2);
-            const flameX = x+w*(0.15+i*0.16);
-            ctx.fillStyle = `rgba(255,50,0,${(0.4-i*0.06)*br})`;
-            ctx.fillRect(flameX, y+h*(0.7-flameH), w*0.12, h*flameH);
-        }
-
-        // Sombra oscura y amplia
-        ctx.fillStyle = 'rgba(200,0,0,0.3)';
+        const B  = (r,g,b) => C(r,g,b,br);
+        const R  = (fx,fy,fw,fh,r,g,b) => {
+            ctx.fillStyle = B(r,g,b);
+            ctx.fillRect(x+fx*w, y+fy*h, fw*w, fh*h);
+        };
+        // Sombra
+        ctx.fillStyle = 'rgba(0,0,0,0.32)';
         ctx.beginPath();
-        ctx.ellipse(x+w/2, y+h, w*0.4, h*0.05, 0, 0, Math.PI*2);
+        ctx.ellipse(x+w*0.50, y+h*0.99, w*0.28, h*0.030, 0, 0, Math.PI*2);
         ctx.fill();
-
-        // Piernas — huesos decorados
-        ctx.fillStyle = C(60,20,20, br);
-        ctx.fillRect(x+w*0.20, y+h*0.65, w*0.25, h*0.32+walk);
-        ctx.fillRect(x+w*0.55, y+h*0.65, w*0.25, h*0.32-walk);
+        // Huesos de piernas (esqueleto con armadura)
+        R(0.215,0.635,0.255,0.172,  38,18,18);
+        R(0.220,0.638,0.072,0.162,  52,25,25);
+        R(0.530,0.635,0.255,0.172,  38,18,18);
         // Costillas en piernas
-        ctx.fillStyle = C(200,200,180, br);
-        for (let i=0;i<3;i++) {
-            ctx.fillRect(x+w*0.21, y+h*(0.68+i*0.08), w*0.08, h*0.03);
-            ctx.fillRect(x+w*0.56, y+h*(0.68+i*0.08), w*0.08, h*0.03);
+        for(let i=0;i<4;i++){
+            R(0.222+i*0.052,0.648,0.038,0.068, 225,215,195);
+            R(0.535+i*0.052,0.651,0.036,0.065, 225,215,195);
         }
-
-        // Capa/manto negro del inframundo
-        ctx.fillStyle = C(20,5,5, br);
-        ctx.fillRect(x+w*0.10, y+h*0.25, w*0.80, h*0.72);
-        // Bordes de llamas en la capa
-        ctx.fillStyle = `rgba(255,80,0,${(0.6+0.4*Math.sin(t*6))*br})`;
-        ctx.fillRect(x+w*0.10, y+h*0.25, w*0.04, h*0.72);
-        ctx.fillRect(x+w*0.86, y+h*0.25, w*0.04, h*0.72);
-
-        // Torso — costillas expuestas
-        ctx.fillStyle = C(60,20,20, br);
-        ctx.fillRect(x+w*0.22, y+h*0.28, w*0.56, h*0.36);
-        ctx.fillStyle = C(200,200,180, br);
-        for (let i=0;i<5;i++)
-            ctx.fillRect(x+w*0.26, y+h*(0.30+i*0.06), w*0.48, h*0.03);
-
+        // Huesos de los pies
+        R(0.202,0.895,0.282,0.042,  225,215,195);
+        R(0.202,0.932,0.282,0.025,  195,185,165);
+        for(let i=0;i<4;i++){
+            R(0.212+i*0.058,0.895,0.040,0.042, 215,205,185);
+            R(0.516+i*0.058,0.895,0.040,0.042, 215,205,185);
+        }
+        // Cinturón de cráneos
+        R(0.215,0.612,0.570,0.032,  28,12,12);
+        for(let i=0;i<5;i++){
+            ctx.fillStyle=B(225,215,195);
+            ctx.beginPath(); ctx.arc(x+w*(0.270+i*0.092), y+h*0.628, w*0.025, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle=B(38,18,18);
+            ctx.fillRect(x+w*(0.260+i*0.092),y+h*0.640,w*0.015,w*0.015);
+            ctx.fillRect(x+w*(0.278+i*0.092),y+h*0.640,w*0.015,w*0.015);
+        }
+        // Torso — caja torácica
+        R(0.208,0.278,0.584,0.345,  38,18,18);
+        R(0.212,0.282,0.078,0.338,  52,25,25);
+        R(0.710,0.282,0.058,0.338,  22,8,8);
+        // Costillas
+        for(let i=0;i<5;i++){
+            R(0.220,0.295+i*0.055,0.215,0.028, 215,205,185);
+            R(0.220,0.297+i*0.055,0.055,0.018, 235,228,212);
+            R(0.565,0.295+i*0.055,0.215,0.028, 215,205,185);
+            R(0.565,0.297+i*0.055,0.055,0.018, 235,228,212);
+        }
+        // Esternón
+        R(0.460,0.285,0.080,0.332,  215,205,185);
+        R(0.464,0.288,0.025,0.325,  235,228,212);
+        // Hombreras de hueso
+        R(0.052,0.252,0.195,0.112,  38,18,18);
+        R(0.056,0.256,0.062,0.098,  52,25,25);
+        R(0.052,0.355,0.195,0.015,  215,205,185);
+        for(let i=0;i<3;i++) R(0.065+i*0.048,0.360,0.032,0.030, 225,218,202);
+        R(0.753,0.252,0.195,0.112,  38,18,18);
+        R(0.835,0.256,0.062,0.098,  52,25,25);
+        R(0.753,0.355,0.195,0.015,  215,205,185);
+        for(let i=0;i<3;i++) R(0.762+i*0.048,0.360,0.032,0.030, 225,218,202);
         // Brazos esqueléticos
-        ctx.fillStyle = C(60,20,20, br);
-        ctx.fillRect(x+w*0.03, y+h*0.28, w*0.16, h*0.38);
-        ctx.fillRect(x+w*0.81, y+h*0.28, w*0.16, h*0.38);
-        // Huesos en los brazos
-        ctx.fillStyle = C(200,200,180, br);
-        for (let i=0;i<4;i++) {
-            ctx.fillRect(x+w*0.04, y+h*(0.30+i*0.09), w*0.06, h*0.02);
-            ctx.fillRect(x+w*0.90, y+h*(0.30+i*0.09), w*0.06, h*0.02);
+        R(0.052,0.348,0.155,0.138,  38,18,18);
+        R(0.056,0.352,0.055,0.130,  52,25,25);
+        R(0.040,0.468,0.168,0.045,  215,205,185);
+        R(0.055,0.506,0.140,0.110,  38,18,18);
+        R(0.793,0.348,0.155,0.138,  38,18,18);
+        R(0.848,0.352,0.055,0.130,  52,25,25);
+        R(0.790,0.468,0.168,0.045,  215,205,185);
+        R(0.805,0.506,0.140,0.110,  38,18,18);
+        // Huesos del antebrazo
+        R(0.042,0.508,0.052,0.108,  215,205,185);
+        R(0.102,0.512,0.045,0.102,  195,185,165);
+        R(0.808,0.508,0.052,0.108,  215,205,185);
+        R(0.868,0.512,0.045,0.102,  195,185,165);
+        // Garras
+        for(let i=0;i<3;i++){
+            R(0.040+i*0.025,0.608,0.020,0.048, 215,205,185);
+            R(0.808+i*0.028,0.608,0.020,0.048, 215,205,185);
         }
-
-        // Guadaña de hueso
-        ctx.fillStyle = C(200,200,180, br);
-        ctx.fillRect(x+w*0.84, y, w*0.06, h*0.60);
-        // Hoja curva de la guadaña
-        ctx.beginPath();
-        ctx.moveTo(x+w*0.90, y+h*0.02);
-        ctx.quadraticCurveTo(x+w*1.10, y+h*0.15, x+w*0.90, y+h*0.28);
-        ctx.strokeStyle = C(200,200,180, br);
-        ctx.lineWidth = Math.max(3, w*0.06);
-        ctx.stroke();
-
-        // CALAVERA — cabeza de Mictlantecuhtli
-        // Cráneo
-        ctx.fillStyle = C(200,200,180, br);
-        ctx.fillRect(x+w*0.25, y, w*0.50, h*0.28);
-        // Cuencas de los ojos (vacías y oscuras)
-        ctx.fillStyle = C(0,0,0, br);
-        ctx.beginPath(); ctx.arc(x+w*0.37, y+h*0.10, w*0.10, 0, Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.arc(x+w*0.63, y+h*0.10, w*0.10, 0, Math.PI*2); ctx.fill();
-        // Llamas en las cuencas
-        ctx.fillStyle = `rgba(255,80,0,${(0.7+0.3*Math.sin(t*8))*br})`;
-        ctx.beginPath(); ctx.arc(x+w*0.37, y+h*0.10, w*0.06, 0, Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.arc(x+w*0.63, y+h*0.10, w*0.06, 0, Math.PI*2); ctx.fill();
-        // Nariz (triángulo oscuro)
-        ctx.fillStyle = C(0,0,0, br);
-        ctx.fillRect(x+w*0.46, y+h*0.16, w*0.08, h*0.06);
+        // Guadaña
+        R(0.828,0.050,0.062,0.608,  88,55,18);
+        R(0.832,0.053,0.025,0.598,  112,72,25);
+        // Hoja de guadaña
+        R(0.728,0.048,0.155,0.062,  188,195,215);
+        R(0.728,0.052,0.148,0.032,  215,222,238);
+        R(0.728,0.048,0.005,0.062,  155,162,178);  // borde
+        R(0.878,0.048,0.008,0.035,  155,162,178);  // punta
+        // Brillo de la hoja
+        R(0.732,0.055,0.095,0.018,  235,242,255);
+        // CABEZA — cráneo con tocado mortuorio
+        // Cráneo base
+        R(0.285,0.052,0.430,0.255,  225,215,195);
+        R(0.290,0.056,0.108,0.245,  242,232,215);
+        R(0.688,0.056,0.062,0.245,  195,185,165);
+        // Cuencas de los ojos (negras y profundas)
+        ctx.fillStyle=B(8,4,4);
+        ctx.beginPath(); ctx.arc(x+w*0.375, y+h*0.152, w*0.055, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x+w*0.625, y+h*0.152, w*0.055, 0, Math.PI*2); ctx.fill();
+        // Fuego del inframundo en las cuencas
+        ctx.fillStyle=B(188,12,12);
+        ctx.beginPath(); ctx.arc(x+w*0.375, y+h*0.152, w*0.032, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x+w*0.625, y+h*0.152, w*0.032, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle=B(235,88,12);
+        ctx.beginPath(); ctx.arc(x+w*0.375, y+h*0.152, w*0.018, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x+w*0.625, y+h*0.152, w*0.018, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle=B(255,215,55);
+        ctx.beginPath(); ctx.arc(x+w*0.375, y+h*0.152, w*0.008, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x+w*0.625, y+h*0.152, w*0.008, 0, Math.PI*2); ctx.fill();
+        // Nariz — cavidad nasal
+        R(0.452,0.178,0.048,0.042,  38,18,18);
+        R(0.458,0.182,0.035,0.030,  22,8,8);
         // Dientes
-        ctx.fillStyle = C(220,220,200, br);
-        for (let i=0;i<6;i++)
-            ctx.fillRect(x+w*(0.30+i*0.07), y+h*0.22, w*0.05, h*0.06);
-        // Corona de espinas/picos del inframundo
-        ctx.fillStyle = C(100,20,20, br);
-        for (let i=0;i<5;i++) {
-            const swing = Math.sin(t*3+i)*w*0.01;
-            ctx.fillRect(x+w*(0.28+i*0.11)+swing, y-h*0.08, w*0.06, h*0.10);
+        for(let i=0;i<8;i++) R(0.300+i*0.050,0.238,0.040,0.032, 242,235,218);
+        for(let i=0;i<7;i++) R(0.325+i*0.050,0.262,0.035,0.025, 215,208,192);
+        // Tocado de plumas negras
+        R(0.255,-0.008,0.490,0.068,  22,8,8);
+        for(let i=0;i<7;i++){
+            const sw=Math.sin(t*2.8+i*0.65)*w*0.012;
+            ctx.fillStyle=i%2===0?B(28,10,10):B(188,12,12);
+            ctx.fillRect(x+w*(0.272+i*0.065)+sw, y-h*0.095, w*0.058, h*0.168);
+            ctx.fillStyle=i%2===0?B(15,5,5):B(145,8,8);
+            ctx.fillRect(x+w*(0.272+i*0.065)+sw+w*0.025, y-h*0.095, w*0.012, h*0.168);
         }
     }
 };
@@ -1012,108 +1259,145 @@ SKINS.mictlantecuhtli = {
 // ══════════════════════════════════════════════════════════════════════════
 SKINS.tonatiuh = {
     nombre: 'Hijo del Sol',
-    piel:     [240, 160,  20],
-    armadura: [200, 100,   0],
-    penacho:  [255, 215,   0],
-
     draw(ctx, x, y, w, h, t, bright) {
         const br = bright;
-        const walk = Math.sin(t*8) * h * 0.05;
-        // Rayos solares animados (el elemento más llamativo)
-        const numRays = 12;
-        for (let i=0;i<numRays;i++) {
-            const angle = (i/numRays)*Math.PI*2 + t*0.5;
-            const rayLen = (0.4+0.15*Math.sin(t*3+i)) * w;
-            const cx = x+w*0.50, cy = y+h*0.12;
-            ctx.strokeStyle = `rgba(255,215,0,${(0.5+0.5*Math.sin(t*4+i))*br})`;
-            ctx.lineWidth = Math.max(2, w*0.04);
-            ctx.beginPath();
-            ctx.moveTo(cx + Math.cos(angle)*w*0.22, cy + Math.sin(angle)*w*0.22);
-            ctx.lineTo(cx + Math.cos(angle)*rayLen,   cy + Math.sin(angle)*rayLen);
-            ctx.stroke();
+        const B  = (r,g,b) => C(r,g,b,br);
+        const R  = (fx,fy,fw,fh,r,g,b) => {
+            ctx.fillStyle = B(r,g,b);
+            ctx.fillRect(x+fx*w, y+fy*h, fw*w, fh*h);
+        };
+        // Sombra
+        ctx.fillStyle = 'rgba(0,0,0,0.32)';
+        ctx.beginPath();
+        ctx.ellipse(x+w*0.50, y+h*0.99, w*0.28, h*0.030, 0, 0, Math.PI*2);
+        ctx.fill();
+        // Piernas doradas brillantes
+        R(0.215,0.635,0.255,0.175,  218,155,12);
+        R(0.220,0.638,0.075,0.165,  248,188,22);
+        R(0.530,0.635,0.255,0.175,  218,155,12);
+        // Rayos en piernas
+        for(let i=0;i<3;i++){
+            R(0.228+i*0.072,0.648,0.048,0.075, 252,222,18);
+            R(0.542+i*0.072,0.651,0.045,0.072, 252,222,18);
         }
-
-        // Sombra dorada
-        ctx.fillStyle = `rgba(255,165,0,0.3)`;
-        ctx.beginPath();
-        ctx.ellipse(x+w/2, y+h, w*0.3, h*0.04, 0, 0, Math.PI*2);
-        ctx.fill();
-
-        // Piernas doradas
-        ctx.fillStyle = C(200,100,0, br);
-        ctx.fillRect(x+w*0.20, y+h*0.65, w*0.25, h*0.30+walk);
-        ctx.fillRect(x+w*0.55, y+h*0.65, w*0.25, h*0.30-walk);
-        // Escamas doradas
-        ctx.fillStyle = C(255,215,0, br);
-        ctx.fillRect(x+w*0.20, y+h*0.66, w*0.25, h*0.04);
-        ctx.fillRect(x+w*0.55, y+h*0.66, w*0.25, h*0.04);
-
-        // Torso — armadura solar con grabados
-        ctx.fillStyle = C(200,100,0, br);
-        ctx.fillRect(x+w*0.18, y+h*0.28, w*0.64, h*0.38);
-        // Sol grabado en el pecho
-        ctx.fillStyle = C(255,215,0, br);
-        ctx.beginPath();
-        ctx.arc(x+w*0.50, y+h*0.45, w*0.15, 0, Math.PI*2);
-        ctx.fill();
-        ctx.fillStyle = C(200,100,0, br);
-        ctx.beginPath();
-        ctx.arc(x+w*0.50, y+h*0.45, w*0.08, 0, Math.PI*2);
-        ctx.fill();
-        // Rayos pequeños del sol en el pecho
-        for (let i=0;i<8;i++) {
-            const a = (i/8)*Math.PI*2;
-            ctx.fillStyle = C(255,215,0, br);
-            ctx.fillRect(
-                x+w*0.50 + Math.cos(a)*w*0.11 - w*0.02,
-                y+h*0.45 + Math.sin(a)*w*0.11 - h*0.01,
-                w*0.04, h*0.02
-            );
+        // Sandalias
+        R(0.202,0.895,0.282,0.042,  175,125,8);
+        R(0.202,0.932,0.282,0.025,  138,95,5);
+        R(0.518,0.895,0.282,0.042,  175,125,8);
+        R(0.518,0.932,0.282,0.025,  138,95,5);
+        // Cinturón de fuego
+        R(0.215,0.612,0.570,0.030,  218,88,12);
+        R(0.440,0.612,0.120,0.030,  252,218,18);
+        R(0.458,0.615,0.085,0.025,  255,245,45);
+        // Torso — armadura solar
+        R(0.208,0.278,0.584,0.345,  218,155,12);
+        R(0.212,0.282,0.078,0.338,  248,188,22);
+        R(0.710,0.282,0.058,0.338,  178,118,8);
+        // Rayos del sol en torso (patrón radial desde el glifo central)
+        for(let i=0;i<8;i++){
+            const ang=i*Math.PI/4;
+            const cx2=0.500, cy2=0.440;
+            R(cx2+Math.cos(ang)*0.065, cy2+Math.sin(ang)*0.048-0.018,
+              0.045, 0.038, 252,218,18);
         }
-
+        // Glifo del sol (tonalá) en el pecho
+        ctx.fillStyle=B(252,218,18);
+        ctx.beginPath(); ctx.arc(x+w*0.500, y+h*0.438, w*0.098, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle=B(218,88,12);
+        ctx.beginPath(); ctx.arc(x+w*0.500, y+h*0.438, w*0.072, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle=B(252,218,18);
+        ctx.beginPath(); ctx.arc(x+w*0.500, y+h*0.438, w*0.048, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle=B(218,88,12);
+        ctx.beginPath(); ctx.arc(x+w*0.500, y+h*0.438, w*0.028, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle=B(255,245,45);
+        ctx.beginPath(); ctx.arc(x+w*0.500, y+h*0.438, w*0.012, 0, Math.PI*2); ctx.fill();
+        // Hombreras solares
+        R(0.052,0.252,0.198,0.115,  218,155,12);
+        R(0.056,0.256,0.065,0.100,  248,188,22);
+        R(0.052,0.255,0.198,0.018,  252,218,18);
+        R(0.052,0.358,0.198,0.018,  252,218,18);
+        // Rayos de las hombreras
+        for(let i=0;i<3;i++){
+            R(0.058+i*0.055,0.230,0.042,0.030, 252,218,18);
+            R(0.755+i*0.055,0.230,0.042,0.030, 252,218,18);
+        }
+        R(0.752,0.252,0.198,0.115,  218,155,12);
+        R(0.835,0.256,0.065,0.100,  248,188,22);
+        R(0.752,0.255,0.198,0.018,  252,218,18);
+        R(0.752,0.358,0.198,0.018,  252,218,18);
         // Brazos dorados
-        ctx.fillStyle = C(240,160,20, br);
-        ctx.fillRect(x+w*0.03, y+h*0.28, w*0.15, h*0.36);
-        ctx.fillRect(x+w*0.82, y+h*0.28, w*0.15, h*0.36);
-        // Brazaletes de oro
-        ctx.fillStyle = C(255,215,0, br);
-        ctx.fillRect(x+w*0.02, y+h*0.50, w*0.17, h*0.05);
-        ctx.fillRect(x+w*0.81, y+h*0.50, w*0.17, h*0.05);
-
-        // Espada de luz solar
-        ctx.fillStyle = `rgba(255,240,100,${br})`;
-        ctx.fillRect(x+w*0.84, y+h*0.16, w*0.08, h*0.48);
-        // Brillo pulsante de la espada
-        ctx.fillStyle = `rgba(255,255,255,${(0.5+0.5*Math.sin(t*10))*br})`;
-        ctx.fillRect(x+w*0.86, y+h*0.17, w*0.04, h*0.46);
-        ctx.fillStyle = C(200,100,0, br);
-        ctx.fillRect(x+w*0.80, y+h*0.34, w*0.16, h*0.04);
-
-        // DISCO SOLAR — cabeza/casco de Tonatiuh
-        // Cara del sol
-        ctx.fillStyle = C(255,215,0, br);
-        ctx.beginPath();
-        ctx.arc(x+w*0.50, y+h*0.12, w*0.28, 0, Math.PI*2);
-        ctx.fill();
-        // Cara dentro del sol
-        ctx.fillStyle = C(240,160,20, br);
-        ctx.beginPath();
-        ctx.arc(x+w*0.50, y+h*0.12, w*0.20, 0, Math.PI*2);
-        ctx.fill();
-        // Ojos brillantes del sol
-        ctx.fillStyle = C(255,255,255, br);
-        ctx.beginPath(); ctx.arc(x+w*0.40, y+h*0.10, w*0.06, 0, Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.arc(x+w*0.60, y+h*0.10, w*0.06, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = `rgba(255,100,0,${br})`;
-        ctx.beginPath(); ctx.arc(x+w*0.40, y+h*0.10, w*0.03, 0, Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.arc(x+w*0.60, y+h*0.10, w*0.03, 0, Math.PI*2); ctx.fill();
-        // Nariz
-        ctx.fillStyle = C(200,100,0, br);
-        ctx.fillRect(x+w*0.47, y+h*0.14, w*0.06, h*0.05);
-        // Lengua del sol (glifo azteca)
-        ctx.fillStyle = C(200,50,0, br);
-        ctx.fillRect(x+w*0.44, y+h*0.19, w*0.12, h*0.04);
-        ctx.fillRect(x+w*0.48, y+h*0.22, w*0.04, h*0.03);
+        R(0.052,0.348,0.155,0.140,  218,155,12);
+        R(0.056,0.352,0.055,0.132,  248,188,22);
+        R(0.040,0.468,0.168,0.045,  252,218,18);
+        R(0.055,0.506,0.140,0.112,  218,155,12);
+        R(0.793,0.348,0.155,0.140,  218,155,12);
+        R(0.850,0.352,0.055,0.132,  248,188,22);
+        R(0.789,0.468,0.168,0.045,  252,218,18);
+        R(0.805,0.506,0.140,0.112,  218,155,12);
+        // Brazaletes de fuego
+        R(0.035,0.488,0.185,0.048,  218,88,12);
+        R(0.040,0.492,0.092,0.032,  252,145,18);
+        R(0.780,0.488,0.185,0.048,  218,88,12);
+        R(0.785,0.492,0.092,0.032,  252,145,18);
+        // Macuahuitl con obsidiana solar
+        R(0.826,0.175,0.102,0.065,  218,155,12);
+        R(0.830,0.178,0.055,0.055,  252,198,22);
+        R(0.812,0.225,0.068,0.398,  218,88,12);
+        R(0.816,0.228,0.028,0.390,  252,125,18);
+        for(let i=0;i<5;i++){
+            R(0.800,0.235+i*0.075,0.022,0.060, 245,242,255);
+            R(0.880,0.238+i*0.075,0.022,0.055, 232,228,248);
+        }
+        // Llamas en el arma
+        for(let i=0;i<3;i++){
+            R(0.798,0.240+i*0.075,0.010,0.048, 252,145,18);
+        }
+        // CABEZA — máscara solar con corona de rayos
+        // Corona de rayos del sol (animada)
+        const nRayos=12;
+        for(let i=0;i<nRayos;i++){
+            const ang=(i/nRayos)*Math.PI*2;
+            const rLen=0.165+Math.sin(t*4+i*0.8)*0.025;
+            const rx=0.500+Math.sin(ang)*rLen;
+            const ry=0.118-Math.cos(ang)*rLen*0.85;
+            const sw=Math.sin(t*3+i*0.9)*w*0.008;
+            ctx.fillStyle=(i%3===0)?B(252,218,18):(i%3===1)?B(218,88,12):B(248,168,18);
+            ctx.fillRect(x+w*rx-w*0.018+sw, y+h*ry-h*0.092, w*0.038, h*0.105);
+            ctx.fillStyle=B(255,245,80);
+            ctx.fillRect(x+w*rx-w*0.006+sw, y+h*ry-h*0.090, w*0.015, h*0.092);
+        }
+        // Cara solar (dorado intenso)
+        R(0.285,0.052,0.430,0.255,  218,155,12);
+        R(0.290,0.056,0.108,0.245,  248,188,22);
+        R(0.688,0.056,0.062,0.245,  178,118,8);
+        // Marcas faciales de fuego
+        R(0.295,0.092,0.182,0.022,  218,88,12);
+        R(0.523,0.092,0.182,0.022,  218,88,12);
+        R(0.300,0.205,0.130,0.018,  218,88,12);
+        R(0.570,0.205,0.130,0.018,  218,88,12);
+        // Ojos del sol (brillantes, como llamas)
+        R(0.322,0.105,0.138,0.028,  138,88,5);
+        R(0.540,0.105,0.138,0.028,  138,88,5);
+        ctx.fillStyle=B(255,215,28);
+        ctx.beginPath(); ctx.arc(x+w*0.390, y+h*0.150, w*0.040, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x+w*0.610, y+h*0.150, w*0.040, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle=B(255,145,12);
+        ctx.beginPath(); ctx.arc(x+w*0.390, y+h*0.150, w*0.025, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x+w*0.610, y+h*0.150, w*0.025, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle=B(255,55,8);
+        ctx.beginPath(); ctx.arc(x+w*0.390, y+h*0.150, w*0.013, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x+w*0.610, y+h*0.150, w*0.013, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle=B(255,255,185);
+        ctx.beginPath(); ctx.arc(x+w*0.382, y+h*0.143, w*0.007, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x+w*0.602, y+h*0.143, w*0.007, 0, Math.PI*2); ctx.fill();
+        // Nariz fuerte
+        R(0.452,0.155,0.068,0.058,  178,118,8);
+        R(0.460,0.160,0.050,0.040,  208,148,12);
+        // Boca con colmillos de fuego
+        R(0.360,0.215,0.165,0.020,  138,68,5);
+        for(let i=0;i<5;i++) R(0.368+i*0.030,0.210,0.022,0.030, 252,218,18);
+        R(0.370,0.234,0.044,0.025,  215,175,15);
+        R(0.470,0.234,0.044,0.025,  215,175,15);
     }
 };
 
@@ -1131,14 +1415,14 @@ function dibujarSkin(ctx, skinNombre, x, y, w, h, t, bright, extra={}) {
 //  LISTA DE SKINS disponibles para el lobby/tienda
 // ══════════════════════════════════════════════════════════════════════════
 const SKIN_CATALOG = [
-    { clave:'guerrero_base',   nombre:'Guerrero Azteca',    costo:0,    nivel:1,  emoji:'⚔️'  },
-    { clave:'jaguar',          nombre:'Caballero Jaguar',   costo:500,  nivel:3,  emoji:'🐆'  },
-    { clave:'aguila',          nombre:'Caballero Águila',   costo:500,  nivel:3,  emoji:'🦅'  },
-    { clave:'sacerdote',       nombre:'Sacerdote Guerrero', costo:800,  nivel:5,  emoji:'🔮'  },
-    { clave:'tlaloc',          nombre:'Guerrero de Tláloc', costo:1200, nivel:7,  emoji:'🌧️'  },
-    { clave:'quetzalcoatl',    nombre:'Serpiente Emplumada',costo:2000, nivel:10, emoji:'🐍'  },
-    { clave:'mictlantecuhtli', nombre:'Sr. del Inframundo', costo:3000, nivel:15, emoji:'💀'  },
-    { clave:'tonatiuh',        nombre:'Hijo del Sol',       costo:5000, nivel:20, emoji:'☀️'  },
+    { clave:'guerrero_base',   nombre:'Guerrero Azteca',    costo:0,     nivel:1,  emoji:'⚔️'  },
+    { clave:'jaguar',          nombre:'Caballero Jaguar',   costo:2500,  nivel:5,  emoji:'🐆'  },
+    { clave:'aguila',          nombre:'Caballero Águila',   costo:2500,  nivel:5,  emoji:'🦅'  },
+    { clave:'sacerdote',       nombre:'Sacerdote Guerrero', costo:5000,  nivel:8,  emoji:'🔮'  },
+    { clave:'tlaloc',          nombre:'Guerrero de Tláloc', costo:8000,  nivel:12, emoji:'🌧️'  },
+    { clave:'quetzalcoatl',    nombre:'Serpiente Emplumada',costo:12000, nivel:15, emoji:'🐍'  },
+    { clave:'mictlantecuhtli', nombre:'Sr. del Inframundo', costo:18000, nivel:20, emoji:'💀'  },
+    { clave:'tonatiuh',        nombre:'Hijo del Sol',       costo:28000, nivel:25, emoji:'☀️'  },
 ];
 
 if (typeof module !== 'undefined') module.exports = { SKINS, dibujarSkin, SKIN_CATALOG, C };

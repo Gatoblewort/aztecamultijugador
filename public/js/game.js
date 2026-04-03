@@ -554,11 +554,33 @@ function disparar() {
     const now=Date.now();
     const arma=ARMAS[armaActual];
     if (now-lastShot<arma.cooldown) return;
+    // Sin munición — clic vacío
+    if (yo && yo.ammo !== undefined && yo.ammo <= 0) {
+        if (now-lastShot > 600) { lastShot=now; clic_vacio(); }
+        return;
+    }
     lastShot=now;
+    // Descontar ammo localmente para HUD inmediato
+    if (yo && yo.ammo !== undefined && yo.ammo > 0) {
+        yo.ammo--;
+        actualizarHUDAmmo();
+    }
     const dx=Math.cos(yo.angle)*BULLET_SPD;
     const dy=Math.sin(yo.angle)*BULLET_SPD;
     SOUND.disparo(armaActual);
     socket.emit('disparar',{x:yo.x,y:yo.y,dx,dy,danio:arma.danio,arma:armaActual,angle:yo.angle});
+}
+
+function clic_vacio() {
+    try {
+        const ac=new(window.AudioContext||window.webkitAudioContext)();
+        const o=ac.createOscillator(),g=ac.createGain();
+        o.connect(g);g.connect(ac.destination);
+        o.type='square';o.frequency.value=110;
+        g.gain.setValueAtTime(0.07,ac.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.0001,ac.currentTime+0.045);
+        o.start();o.stop(ac.currentTime+0.045);
+    } catch(e){}
 }
 
 function cambiarArma() {

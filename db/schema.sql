@@ -81,11 +81,11 @@ CREATE TABLE IF NOT EXISTS ranking (
 -- SKINS BASE
 INSERT INTO skins (clave, nombre, descripcion, costo_monedas, nivel_requerido, color_r, color_g, color_b, color_armadura_r, color_armadura_g, color_armadura_b) VALUES
 ('guerrero_base',   'Guerrero Azteca',    'El guerrero clásico del pueblo del sol',        0,    1,  180, 130,  70,  80,  60,  30),
-('jaguar',          'Caballero Jaguar',   'El guerrero más temido en batalla',           500,    3,  140,  90,  50, 160, 120,  40),
-('aguila',          'Caballero Águila',   'Veloz como el viento del cielo',              500,    3,  200, 170, 120, 220, 200, 160),
-('sacerdote',       'Sacerdote Guerrero', 'Portador de la magia del Quinto Sol',         800,    5,  100,  60, 140,  60,  40,  80),
-('tlaloc',          'Guerrero de Tláloc', 'Bendecido por el dios de la lluvia',         1200,    7,   60, 100, 180,  40,  80, 140),
-('quetzalcoatl',    'Serpiente Emplumada','El avatar del dios creador',                 2000,   10,  220, 200,  40, 180, 160,  20),
-('mictlantecuhtli', 'Señor del Inframundo','Regresa de Mictlán para sembrar el caos',  3000,   15,   60,  20,  20, 100,  20,  20),
-('tonatiuh',        'Hijo del Sol',       'El guerrero del Quinto Sol en persona',      5000,   20,  240, 160,  20, 200, 100,   0)
+('jaguar',          'Caballero Jaguar',   'El guerrero más temido en batalla',           2500,    5,  140,  90,  50, 160, 120,  40),
+('aguila',          'Caballero Águila',   'Veloz como el viento del cielo',              2500,    5,  200, 170, 120, 220, 200, 160),
+('sacerdote',       'Sacerdote Guerrero', 'Portador de la magia del Quinto Sol',         5000,    8,  100,  60, 140,  60,  40,  80),
+('tlaloc',          'Guerrero de Tláloc', 'Bendecido por el dios de la lluvia',          8000,   12,   60, 100, 180,  40,  80, 140),
+('quetzalcoatl',    'Serpiente Emplumada','El avatar del dios creador',                 12000,   15,  220, 200,  40, 180, 160,  20),
+('mictlantecuhtli', 'Señor del Inframundo','Regresa de Mictlán para sembrar el caos',  18000,   20,   60,  20,  20, 100,  20,  20),
+('tonatiuh',        'Hijo del Sol',       'El guerrero del Quinto Sol en persona',      28000,   25,  240, 160,  20, 200, 100,   0)
 ON CONFLICT (clave) DO NOTHING;
